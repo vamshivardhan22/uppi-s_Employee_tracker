@@ -11,10 +11,11 @@ function doGet() {
 function getIdentityDiagnostic() {
   const activeEmail = normalizeEmail_(Session.getActiveUser().getEmail());
   const effectiveEmail = normalizeEmail_(Session.getEffectiveUser().getEmail());
+  // Keep the owner's effective identity in server-side execution logs, not in the public response.
+  Logger.log('Identity diagnostic activeUserEmail=%s; effectiveUserEmail=%s', activeEmail, effectiveEmail);
 
   return {
     activeUserEmail: activeEmail,
-    effectiveUserEmail: effectiveEmail,
     timestamp: Utilities.formatDate(new Date(), APP.TIME_ZONE, "yyyy-MM-dd'T'HH:mm:ssXXX"),
     timeZone: APP.TIME_ZONE,
     identityGatePassed: isIdentityGatePassed_(),

@@ -21,7 +21,7 @@
 
 - Browser input is untrusted. The API accepts no email parameter for user data requests.
 - `Session.getActiveUser().getEmail()` is the intended visitor identity, but Apps Script may return blank depending on account type and deployment configuration.
-- `Session.getEffectiveUser().getEmail()` is diagnostic only and is never used for authorization.
+- `Session.getEffectiveUser().getEmail()` is diagnostic only, logged server-side, and never returned to the browser or used for authorization.
 - The script owner must have read access to every configured source spreadsheet.
 - The master spreadsheet must remain private; never share it with labellers just to make the script work.
 

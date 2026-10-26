@@ -18,7 +18,7 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 ## B. Identity gate — mandatory before any task data
 
 - [ ] Deploy the TEST web app for the intended audience and open its `/exec` URL as a test admin.
-- [ ] Record active-user email, effective-user email, timestamp and deployment audience.
+- [ ] Record active-user email, timestamp and deployment audience. The effective-user identity is logged server-side in Apps Script execution logs and is not exposed in the public diagnostic response.
 - [ ] Repeat in a separate browser/incognito session as a test labeller.
 - [ ] Active-user email is nonblank and exactly matches the signed-in account in both sessions.
 - [ ] Active-user identity is not confused with the script owner's effective identity.

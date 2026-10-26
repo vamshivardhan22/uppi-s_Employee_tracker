@@ -59,7 +59,7 @@
       button.disabled=false;
       document.getElementById('phase').textContent=result.identityGatePassed?'Phase 1 enabled':'Phase 0 · data locked';
       document.getElementById('details').textContent='Active user: '+(result.activeUserEmail||'(blank)')+
-        ' · Effective user: '+(result.effectiveUserEmail||'(blank)')+' · '+result.timestamp+' · '+result.timeZone;
+        ' · '+result.timestamp+' · '+result.timeZone;
       if(!result.activeUserEmail) setStatus('STOP: active-user email is blank. Do not enable data access.','bad');
       else if(!result.identityGatePassed) setStatus('Email returned. Compare it with the signed-in test account. Task data remains locked.','');
       else setStatus('Identity gate enabled. Employee access is checked again server-side.','good');
