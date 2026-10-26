@@ -4,44 +4,36 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/**
- * Phase 0 diagnostic only. Intentionally reads no master or task spreadsheet.
- * Verify the deployed /exec URL as both a test admin and test labeller.
- */
+/** Phase 0 status endpoint. Reads no spreadsheet and reveals no account identity. */
 function getIdentityDiagnostic() {
-  const activeEmail = normalizeEmail_(Session.getActiveUser().getEmail());
-  const effectiveEmail = normalizeEmail_(Session.getEffectiveUser().getEmail());
-  // Keep the owner's effective identity in server-side execution logs, not in the public response.
-  Logger.log('Identity diagnostic activeUserEmail=%s; effectiveUserEmail=%s', activeEmail, effectiveEmail);
-
   return {
-    activeUserEmail: activeEmail,
+    authMethod: 'employee_access_code',
     timestamp: Utilities.formatDate(new Date(), APP.TIME_ZONE, "yyyy-MM-dd'T'HH:mm:ssXXX"),
     timeZone: APP.TIME_ZONE,
-    identityGatePassed: isIdentityGatePassed_(),
-    message: activeEmail
-      ? 'Compare activeUserEmail with the account used to open this deployed app.'
-      : 'Active-user email is blank. Keep the identity gate closed.'
+    dataGatePassed: isIdentityGatePassed_(),
+    message: 'Sign in with your Employees email and privately issued access code.'
   };
 }
 
-function getBootstrap() {
-  const identity = getIdentityDiagnostic();
-
-  if (!identity.activeUserEmail) {
-    return { ok: false, phase: 0, identity: identity, message: 'Identity could not be verified.' };
+function getBootstrap(authToken) {
+  if (!authToken) {
+    return { ok: false, phase: 0, message: 'Sign in with your employee email and access code.' };
   }
-
-  if (!isIdentityGatePassed_()) {
-    return { ok: true, phase: 0, identity: identity, message: 'Identity gate is closed; no task data is available.' };
+  let user;
+  try {
+    user = getAuthenticatedEmployee_(authToken);
+  } catch (error) {
+    return { ok: false, phase: 0, message: 'Your session is expired or invalid. Sign in again.' };
   }
-
-  const user = requireActiveEmployee_();
+  const gatePassed = isIdentityGatePassed_();
   return {
     ok: true,
-    phase: 1,
-    identity: identity,
+    phase: gatePassed ? 1 : 0,
+    dataGatePassed: gatePassed,
     user: { email: user.email, displayName: user.displayName, role: user.role },
-    message: 'Identity and employee access verified.'
+    timeZone: APP.TIME_ZONE,
+    message: gatePassed
+      ? 'Signed in. Server-side access checks are applied to each request.'
+      : 'Signed in, but app data is locked until the administrator enables the TEST data gate.'
   };
 }
