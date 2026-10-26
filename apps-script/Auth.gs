@@ -30,6 +30,7 @@ function findHeaderIndex_(headers, expectedName) {
 
 const AUTH = Object.freeze({
   CREDENTIAL_SHEET: 'Employee_Credentials',
+  PROVISION_EMAIL_PROPERTY: 'ACCESS_CODE_FOR_EMAIL',
   CREDENTIAL_HEADERS: Object.freeze([
     'Email', 'Access Code Hash', 'Active', 'Created At', 'Updated At'
   ]),
@@ -130,9 +131,10 @@ function findActiveEmployeeByEmail_(email) {
  * It logs a one-time access code; copy it directly to the intended employee using a private channel.
  * Do not expose this function through the browser UI.
  */
-function provisionEmployeeAccessCode_(emailValue) {
-  const email = normalizeEmail_(emailValue);
-  if (!email) throw new Error('Enter an employee email address.');
+function provisionEmployeeAccessCode_() {
+  const props = PropertiesService.getScriptProperties();
+  const email = normalizeEmail_(props.getProperty(AUTH.PROVISION_EMAIL_PROPERTY));
+  if (!email) throw new Error('Set Script Property ' + AUTH.PROVISION_EMAIL_PROPERTY + ' to the employee email before running this helper.');
   const user = findActiveEmployeeByEmail_(email);
   if (!user) throw new Error('The email must match exactly one active Employees row with a valid role.');
 
@@ -169,6 +171,7 @@ function provisionEmployeeAccessCode_(emailValue) {
     }
 
     Logger.log('ONE-TIME ACCESS CODE for %s: %s', email, code);
+    props.deleteProperty(AUTH.PROVISION_EMAIL_PROPERTY);
     return 'Access code generated and stored as a hash. Copy the one-time code from the execution log and deliver it privately.';
   } finally {
     lock.releaseLock();
