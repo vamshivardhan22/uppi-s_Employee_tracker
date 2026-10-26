@@ -39,6 +39,42 @@
     </div>
     <div id="errors" class="panel hidden"></div>
     <div class="panel"><h2>My task records</h2><div class="tablewrap"><table><thead><tr><th>Project</th><th>Dataset Set ID</th><th>Status</th><th>Assigned date</th><th>Submitted date</th><th>Approved</th><th>Rejected</th><th>Hold note</th></tr></thead><tbody id="rows"><tr><td colspan="8">No data loaded.</td></tr></tbody></table></div></div>
+    <section id="attendancePanel" class="panel">
+      <h2>Attendance & leave</h2>
+      <div class="muted">Actions use server timestamps in Asia/Kolkata. Your attendance records are private to your account; admins can review leave requests.</div>
+      <div id="attendanceStatus" class="status">Attendance status has not loaded.</div>
+      <div id="attendanceControls">
+        <button id="clockInButton" onclick="runAttendanceAction('CLOCK_IN')">Clock in</button>
+        <button id="clockOutButton" onclick="runAttendanceAction('CLOCK_OUT')">Clock out</button>
+        <label class="small" for="breakType">Break type</label>
+        <select id="breakType"><option value="tea">Tea</option><option value="lunch">Lunch</option><option value="personal">Personal</option><option value="other">Other</option></select>
+        <button id="breakStartButton" onclick="runAttendanceAction('BREAK_START')">Start break</button>
+        <button id="breakEndButton" onclick="runAttendanceAction('BREAK_END')">End break</button>
+        <button onclick="loadAttendance()">Refresh attendance</button>
+      </div>
+      <div id="attendanceAdminTools" class="hidden">
+        <button onclick="initializeAttendance()">Initialize attendance storage</button>
+        <div class="small">Creates only app-owned attendance tabs in the private master spreadsheet. Existing tabs with mismatched headers are not overwritten.</div>
+      </div>
+      <div class="panel">
+        <h2>Request leave</h2>
+        <div class="cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <label>Leave type<select id="leaveType" onchange="toggleLeaveFields()"><option value="full_day">Full day</option><option value="half_day">Half day</option><option value="short_leave">Short leave</option></select></label>
+          <label>Start date<input id="leaveStartDate" type="date" required></label>
+          <label>End date<input id="leaveEndDate" type="date" required></label>
+          <label id="partialPeriodWrap" class="hidden">Half-day period<select id="partialPeriod"><option value="AM">AM</option><option value="PM">PM</option></select></label>
+          <label id="shortStartWrap" class="hidden">Short-leave start time<input id="shortStartTime" type="time"></label>
+          <label id="shortEndWrap" class="hidden">Short-leave end time<input id="shortEndTime" type="time"></label>
+          <label style="grid-column:1/-1">Reason (optional)<input id="leaveReason" type="text" maxlength="500" placeholder="Add a short reason"></label>
+        </div>
+        <button onclick="submitLeave()">Submit leave request</button>
+      </div>
+      <div class="panel">
+        <h2>Leave requests</h2>
+        <button onclick="loadLeaveRequests()">Refresh requests</button>
+        <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>Date</th><th>Type</th><th>Status</th><th>Details</th><th id="leaveActionsHeader">Action</th></tr></thead><tbody id="leaveRows"><tr><td colspan="5">No requests loaded.</td></tr></tbody></table></div>
+      </div>
+    </section>
   </section>
   <p class="small">TEST starter only. Attendance, breaks, issue scanning, reminders, admin screens, charts and snapshots are later phases.</p>
 </main>
@@ -104,6 +140,7 @@
           data.projectErrors.map(function(item){return '<li><strong>'+escapeHtml(item.projectName||item.projectId)+
           ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
         setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
+        loadAttendance();
       }).withFailureHandler(function(error) {
         button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
       }).getMyWork();
@@ -111,5 +148,121 @@
       button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
     }).getBootstrap();
   }
+  function newRequestId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID().replace(/-/g,'');
+    return 'req_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14);
+  }
+  function attendanceMessage(message, kind) {
+    var el=document.getElementById('attendanceStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function loadAttendance() {
+    google.script.run.withSuccessHandler(function(data) {
+      var session=data.session;
+      var open=data.hasOpenSession;
+      var lines=['Today: '+data.today+' ('+data.timeZone+')'];
+      if(session) lines.push('Clocked in at '+session.clockInAt);
+      else if(open) lines.push('A previous-day session remains open. Contact an administrator; do not clock in again.');
+      else lines.push('No open attendance session.');
+      if(data.openBreak) lines.push('Active break: '+data.openBreak.type+' since '+data.openBreak.startAt);
+      attendanceMessage(lines.join(' · '),open&&!session?'warn':'good');
+      document.getElementById('clockInButton').disabled=open;
+      document.getElementById('clockOutButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakStartButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakEndButton').disabled=!Boolean(data.openBreak);
+      if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getMyAttendanceStatus();
+  }
+  function runAttendanceAction(action) {
+    var requestId=newRequestId();
+    var runner=google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message||'Attendance action recorded.','good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    });
+    if(action==='CLOCK_IN') runner.attendanceClockIn(requestId);
+    else if(action==='CLOCK_OUT') runner.attendanceClockOut(requestId);
+    else if(action==='BREAK_START') runner.attendanceStartBreak(requestId,document.getElementById('breakType').value);
+    else if(action==='BREAK_END') runner.attendanceEndBreak(requestId);
+  }
+  function initializeAttendance() {
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).initializeAttendanceStorage();
+  }
+  function toggleLeaveFields() {
+    var type=document.getElementById('leaveType').value;
+    document.getElementById('partialPeriodWrap').classList.toggle('hidden',type!=='half_day');
+    document.getElementById('shortStartWrap').classList.toggle('hidden',type!=='short_leave');
+    document.getElementById('shortEndWrap').classList.toggle('hidden',type!=='short_leave');
+    if(type==='short_leave') document.getElementById('leaveEndDate').value=document.getElementById('leaveStartDate').value;
+  }
+  function submitLeave() {
+    var type=document.getElementById('leaveType').value;
+    var startDate=document.getElementById('leaveStartDate').value;
+    var payload={
+      startDate:startDate,
+      endDate:type==='short_leave'?startDate:document.getElementById('leaveEndDate').value,
+      leaveType:type,
+      partialPeriod:type==='half_day'?document.getElementById('partialPeriod').value:'',
+      startTime:type==='short_leave'?document.getElementById('shortStartTime').value:'',
+      endTime:type==='short_leave'?document.getElementById('shortEndTime').value:'',
+      reason:document.getElementById('leaveReason').value
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceSubmitLeaveRequest(payload,newRequestId());
+  }
+  function loadLeaveRequests() {
+    google.script.run.withSuccessHandler(function(result) {
+      var isAdmin=result.role==='admin';
+      document.getElementById('leaveActionsHeader').textContent=isAdmin?'Review':'Details';
+      var body=document.getElementById('leaveRows');
+      if(!result.rows.length) {
+        body.innerHTML='<tr><td colspan="5">No leave requests found.</td></tr>';
+        return;
+      }
+      body.innerHTML=result.rows.map(function(row) {
+        var date=escapeHtml(row.startDate)+(row.endDate!==row.startDate?' – '+escapeHtml(row.endDate):'');
+        var details=escapeHtml(row.partialPeriod||'')+(row.startTime?' '+escapeHtml(row.startTime)+'–'+escapeHtml(row.endTime):'')+
+          (row.reason?' · '+escapeHtml(row.reason):'')+(isAdmin&&row.email?' · '+escapeHtml(row.email):'');
+        var actions=isAdmin&&row.status==='PENDING'
+          ? '<button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'APPROVED\')">Approve</button><button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'REJECTED\')">Reject</button>'
+          : escapeHtml(row.status);
+        return '<tr><td>'+date+'</td><td>'+escapeHtml(row.leaveType.replace('_',' '))+'</td><td>'+escapeHtml(row.status)+'</td><td>'+details+'</td><td>'+actions+'</td></tr>';
+      }).join('');
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getAttendanceLeaveRequests();
+  }
+  function reviewLeave(leaveId,decision) {
+    var note=window.prompt('Optional review note:')||'';
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceReviewLeaveRequest(leaveId,decision,note,newRequestId());
+  }
+  document.addEventListener('DOMContentLoaded',function() {
+    var today=new Date();
+    var localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    document.getElementById('leaveStartDate').value=localDate;
+    document.getElementById('leaveEndDate').value=localDate;
+    document.getElementById('leaveStartDate').addEventListener('change',function() {
+      if(document.getElementById('leaveType').value==='short_leave') document.getElementById('leaveEndDate').value=this.value;
+    });
+  });
   checkIdentity();
 </script></body></html>
