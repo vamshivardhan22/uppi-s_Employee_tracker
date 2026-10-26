@@ -50,6 +50,7 @@ This document describes the architecture agreed for this project. Implement the 
 - Attendance actions do not accept an employee email from the browser. The server derives the active user and checks the employee record for each call.
 - `Attendance_Events` is append-only from application code. Session and break summary rows are updated as the current state; request records support safe replay of a previously successful request.
 - The script lock serializes actions within this Apps Script project, but Google Sheets does not provide a multi-tab transaction. Runtime failure-injection tests are required before production use.
+- Work dates and leave dates are stored as ISO `YYYY-MM-DD` strings to avoid browser and spreadsheet timezone shifts; event timestamps remain server-generated date-time values formatted in `Asia/Kolkata`.
 - A labeller can read only their own leave requests; admin leave-review calls are role-checked on the server.
 
 ## Operational constraints
