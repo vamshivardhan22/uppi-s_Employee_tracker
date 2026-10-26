@@ -6,7 +6,7 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 
 - [ ] Apps Script project timezone is `Asia/Kolkata`.
 - [ ] Script Property `MASTER_SPREADSHEET_ID` points to the private TEST master.
-- [ ] Script Property `IDENTITY_GATE_PASSED` is exactly `false` during identity tests.
+- [ ] Script Property `IDENTITY_GATE_PASSED` is exactly `false` during access-code authentication tests.
 - [ ] Master tabs exist with exact headers:
   - Employees: `Email`, `Display Name`, `Role`, `Active`
   - Projects: `Project ID`, `Project Name`, `Spreadsheet ID`, `Tab Name`, `Timezone`, `Active`
@@ -52,7 +52,7 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 
 ## E. UI and runtime
 
-- [ ] Initial render calls only the identity diagnostic.
+- [ ] Initial render displays the sign-in form without exposing account identities or reading task-source data.
 - [ ] Refresh updates the displayed timestamp.
 - [ ] Empty assignments show a clear empty state.
 - [ ] Partial project failures are visibly labeled; don't use partial totals operationally.
