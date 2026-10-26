@@ -2,40 +2,43 @@
 
 Last updated: 2026-10-26
 
-## Implemented in starter code
+## Current repository state
 
-- Web-app entry point and responsive HTML shell.
-- Identity-only diagnostic endpoint that does not read employee or task spreadsheets.
-- Closed-by-default identity gate controlled by Script Properties.
+Phase 0/1 starter code is committed on the development branch. It has not been deployed to Apps Script or tested against live Google accounts or real spreadsheets. GitHub commit success is not runtime verification.
+
+## Implemented in source
+
+- Apps Script web-app entry point and responsive HTML shell.
+- Identity-only diagnostic endpoint that intentionally reads no spreadsheet data.
+- Identity gate closed unless Script Property `IDENTITY_GATE_PASSED` is exactly `true`.
 - Server-side active employee and role validation.
-- Server-side project assignment filtering.
-- Read-only source-sheet reads using the configured tab name.
-- Server-side row filtering by the authenticated account email.
-- Basic My Work table and counts for assigned rows, completed statuses, distinct set IDs and assigned projects.
-- Project-level configuration errors are returned for display rather than silently treated as zero records.
+- Server-side project access filtering and source-sheet reads by configured tab name.
+- Server-side filtering by the authenticated user's normalized email; no browser email parameter.
+- Read-only My Work table and basic row/status/set/project counts.
+- Visible project errors and a partial-data warning if one or more project reads fail.
+- Date-only values serialized in the configured project timezone to reduce browser timezone shifts.
+- Duplicate mapping and duplicate header checks.
 
 ## Not implemented
 
 - Attendance, full/half/short leave, login/logout, breaks or automatic session closure.
-- TAT calculations or issue lifecycle/duplicate detection.
-- Reminder mail, digest caps or scheduled scanner/triggers.
-- Admin screens, People/Projects editing or grant/revoke flows.
-- My Reports, attendance history, charts, snapshots or heartbeat monitoring.
-- Performance, concurrency, quota, deployment-audience or live Google account testing.
-- Production deployment and pilot.
+- TAT calculations, issue lifecycle, duplicate task detection or validation reminders.
+- Scheduled scanner, email digests, quota-aware mail handling or heartbeat monitoring.
+- Admin People/Projects management or grant/revoke flows.
+- My Reports, attendance history, charts, snapshots or performance/load tests.
+- Deployment audience verification, identity matrix, live Google account tests, production deployment or pilot.
 
-## Known design constraints requiring verification
+## Known limitations and release blockers
 
-1. **Identity gate is deployment-dependent.** `Session.getActiveUser().getEmail()` may be blank for some web-app deployments and account types. Never infer identity from `getEffectiveUser()`; it may be the script owner.
-2. **Source-sheet access.** The executing account needs access to each configured project spreadsheet.
-3. **Header mapping.** Canonical names in `Column_Map` must match application keys; source header strings must match source headers. Rename events should be tested.
-4. **Status semantics.** The starter currently counts `Labelling Done`, `Review Done`, `Approved`, and `Rework Done` as completed. Confirm this list against the final task workflow before using it for reporting.
-5. **Counting semantics.** A task count is the number of matching source rows. Distinct sets are counted by project ID plus Dataset Set ID. Confirm that this is the intended unit.
-6. **Date handling.** The starter returns ISO timestamps. Date-only source cells can be serialized through JavaScript Date objects; verify visible dates for actual source cell types and spreadsheet timezone.
-7. **Load limits.** Current code reads each configured source tab's `getDataRange()` in one operation. Chunking and scan cursors are not included. Load-test before adding many large projects.
-8. **Partial project failures.** The UI can show rows from successful projects plus visible errors from failed projects; users must not interpret partial totals as complete. This should become a clearly labeled partial-data state before wider rollout.
-9. **No automated test runner yet.** The code has not been run inside Apps Script. A push does not prove deployment correctness.
+1. **Identity is deployment-dependent.** `Session.getActiveUser().getEmail()` can be blank depending on account type and deployment. Never substitute `getEffectiveUser()` as the visitor identity.
+2. **Status semantics are provisional.** The current completed-status list is proposed in the build plan and must be confirmed against the actual task workflow before metrics are used operationally.
+3. **Task counts are source rows.** Distinct sets are counted by Project ID + Dataset Set ID. Confirm this is the intended counting unit.
+4. **Date fields are treated as date-only.** If a source column contains date-time values, this serializer intentionally presents the date portion only; confirm the source's actual semantics.
+5. **Required mappings are enforced for Set ID, Annotator Mail and Status.** The `Required` flag in Column_Map is documented for configuration but additional required-field validation belongs to the issue-scanner phase.
+6. **Reads are not chunked yet.** Each configured tab is read in one `getDataRange()` call. Large projects need load testing and a chunked scanner before wider rollout.
+7. **Partial totals can still be displayed.** The UI now labels them as partial and lists project failures. Do not use partial totals for decisions.
+8. **No automated Apps Script test runner is included.** Static inspection cannot prove deployment, authorization, quota, or Google Sheets runtime behavior.
 
-## Release gate
+## Release rule
 
-Do not enable production access until identity, privacy isolation, metric definitions, date behavior, failure presentation, quotas, backup/restore, and pilot acceptance have been tested.
+Keep the gate closed until the deployed `/exec` identity matrix passes for both admin and labeller accounts. Do not connect production data or enable scheduled triggers/outgoing emails until privacy isolation, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.

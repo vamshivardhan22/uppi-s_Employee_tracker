@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--ink:#182230;--muted:#667085;--line:#e5eaf0;--blue:#2457d6;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+    main{max-width:1180px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:20px}
+    h1{font-size:23px;margin:0}h2{font-size:16px;margin:0 0 12px}.muted,.small{color:var(--muted)}.small{font-size:12px}
+    .panel,.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px;margin-bottom:14px}
+    .status{padding:12px;border-radius:10px;background:#eef4ff;color:#1d4ed8;margin:12px 0}.bad{background:#fef3f2;color:#b42318}.good{background:#ecfdf3;color:#067647}.warn{background:#fffaeb;color:#93370d}
+    button{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:10px 13px;font-weight:650;cursor:pointer;margin:4px 5px 4px 0}button:disabled{opacity:.55;cursor:wait}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}.label{font-size:12px;color:var(--muted)}.value{font-size:27px;font-weight:750;margin-top:5px}
+    .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:760px;background:#fff}
+    th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;color:var(--muted);background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}
+    .hidden{display:none!important}.error-list{color:#b42318;padding-left:20px}
+    @media(max-width:700px){main{padding:14px}header{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.value{font-size:24px}}
+  </style>
+</head>
+<body><main>
+  <header><div><h1>Labeller Dashboard</h1><div class="muted">Work overview · Phase 0/1</div></div><div id="phase" class="small">Identity check</div></header>
+  <section class="panel">
+    <h2>Secure sign-in check</h2>
+    <div class="muted">This check reads no employee or task records. Data remains locked until the administrator verifies the deployed identity behavior.</div>
+    <div id="status" class="status">Checking identity…</div><div id="details" class="small"></div>
+    <button id="identityButton" onclick="checkIdentity()">Check identity</button>
+    <button id="loadButton" onclick="loadWork()">Load my work</button>
+  </section>
+  <section id="work" class="hidden">
+    <div class="panel"><h2 id="welcome">My Work</h2><div class="muted">Read-only view of your mapped task rows.</div><button id="refreshButton" onclick="loadWork()">Refresh</button><span id="stamp" class="small"></span></div>
+    <div id="partialWarning" class="status warn hidden">Some projects could not be read. The figures below are partial and must not be treated as complete.</div>
+    <div class="cards">
+      <div class="card"><div class="label">Assigned tasks</div><div id="assigned" class="value">—</div></div>
+      <div class="card"><div class="label">Completed tasks</div><div id="completed" class="value">—</div></div>
+      <div class="card"><div class="label">Distinct dataset sets</div><div id="sets" class="value">—</div></div>
+      <div class="card"><div class="label">Assigned projects</div><div id="projects" class="value">—</div></div>
+    </div>
+    <div id="errors" class="panel hidden"></div>
+    <div class="panel"><h2>My task records</h2><div class="tablewrap"><table><thead><tr><th>Project</th><th>Dataset Set ID</th><th>Status</th><th>Assigned date</th><th>Submitted date</th><th>Approved</th><th>Rejected</th><th>Hold note</th></tr></thead><tbody id="rows"><tr><td colspan="8">No data loaded.</td></tr></tbody></table></div></div>
+  </section>
+  <p class="small">TEST starter only. Attendance, breaks, issue scanning, reminders, admin screens, charts and snapshots are later phases.</p>
+</main>
+<script>
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+    });
+  }
+  function setStatus(message, kind) {
+    var el=document.getElementById('status');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function checkIdentity() {
+    var button=document.getElementById('identityButton'); button.disabled=true;
+    google.script.run.withSuccessHandler(function(result) {
+      button.disabled=false;
+      document.getElementById('phase').textContent=result.identityGatePassed?'Phase 1 enabled':'Phase 0 · data locked';
+      document.getElementById('details').textContent='Active user: '+(result.activeUserEmail||'(blank)')+
+        ' · Effective user: '+(result.effectiveUserEmail||'(blank)')+' · '+result.timestamp+' · '+result.timeZone;
+      if(!result.activeUserEmail) setStatus('STOP: active-user email is blank. Do not enable data access.','bad');
+      else if(!result.identityGatePassed) setStatus('Email returned. Compare it with the signed-in test account. Task data remains locked.','');
+      else setStatus('Identity gate enabled. Employee access is checked again server-side.','good');
+    }).withFailureHandler(function(error) {
+      button.disabled=false; setStatus(error.message||String(error),'bad');
+    }).getIdentityDiagnostic();
+  }
+  function displayDate(value) {
+    if(!value) return '—';
+    var text=String(value);
+    // Date-only values are intentionally kept as date-only to avoid timezone shifts.
+    if(/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    var date=new Date(text);
+    return isNaN(date.getTime())?escapeHtml(text):date.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata'});
+  }
+  function loadWork() {
+    var button=document.getElementById('loadButton'), refresh=document.getElementById('refreshButton');
+    button.disabled=true;if(refresh)refresh.disabled=true;
+    google.script.run.withSuccessHandler(function(bootstrap) {
+      if(!bootstrap.ok||bootstrap.phase===0) {
+        checkIdentity();button.disabled=false;if(refresh)refresh.disabled=false;return;
+      }
+      google.script.run.withSuccessHandler(function(data) {
+        button.disabled=false;if(refresh)refresh.disabled=false;
+        document.getElementById('work').classList.remove('hidden');
+        document.getElementById('welcome').textContent='My Work · '+(data.user.displayName||data.user.email);
+        document.getElementById('assigned').textContent=data.cards.assignedTasks;
+        document.getElementById('completed').textContent=data.cards.completedTasks;
+        document.getElementById('sets').textContent=data.cards.distinctSets;
+        document.getElementById('projects').textContent=data.cards.assignedProjects;
+        document.getElementById('stamp').textContent=' Last refreshed: '+data.refreshedAt;
+        document.getElementById('partialWarning').classList.toggle('hidden',!data.hasPartialData);
+        document.getElementById('rows').innerHTML=data.rows.length?data.rows.map(function(row) {
+          return '<tr><td>'+escapeHtml(row.projectName)+'</td><td>'+escapeHtml(row.datasetSetId)+'</td><td>'+
+            escapeHtml(row.status)+'</td><td>'+displayDate(row.assignedDate)+'</td><td>'+displayDate(row.submittedDate)+
+            '</td><td>'+escapeHtml(row.approvedObjects||'—')+'</td><td>'+escapeHtml(row.rejectedObjects||'—')+
+            '</td><td>'+escapeHtml(row.holdNote||'—')+'</td></tr>';
+        }).join(''):'<tr><td colspan="8">No task rows found for your account.</td></tr>';
+        var errors=document.getElementById('errors');
+        errors.classList.toggle('hidden',!data.projectErrors.length);
+        errors.innerHTML=data.projectErrors.length?'<h2>Project connection issues</h2><ul class="error-list">'+
+          data.projectErrors.map(function(item){return '<li><strong>'+escapeHtml(item.projectName||item.projectId)+
+          ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
+        setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
+      }).withFailureHandler(function(error) {
+        button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
+      }).getMyWork();
+    }).withFailureHandler(function(error) {
+      button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
+    }).getBootstrap();
+  }
+  checkIdentity();
+</script></body></html>
