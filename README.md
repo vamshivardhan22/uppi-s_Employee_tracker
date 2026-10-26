@@ -6,7 +6,7 @@ A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed d
 
 The repository contains the Phase 0/1 starter and Phase 2 attendance/leave implementation. It is **not a completed or production-verified application**.
 
-- **Phase 0:** verify the deployed app's active-user identity without reading spreadsheet data.
+- **Phase 0:** verify app-level access-code authentication for personal Gmail users while the data gate is closed.
 - **Phase 1:** deliver the authenticated, read-only My Work dashboard.
 - **Phase 2:** attendance, leave, login/logout and break tracking (code added; TEST runtime verification is still pending).
 - **Phase 3:** issue scanning, turnaround-time checks, reminders and quota-aware scheduled processing.
@@ -61,15 +61,13 @@ docs/
    - `Access`: `Email`, `Project ID`, `Active`
    - `Column_Map`: `Project ID`, `Canonical Field`, `Sheet Header`, `Required`
 6. Use synthetic users and a fake project sheet. Ensure the script owner has read access to that source sheet.
-7. Deploy a **test** web app using the intended access audience. Do not assume Apps Script returns the visitor's email: behavior depends on account type and deployment settings.
-8. Open the deployed `/exec` URL as a test admin and a test labeller in separate sessions. Confirm `activeUserEmail` is nonblank and exactly matches each signed-in account. If blank or incorrect, STOP; keep the gate closed.
-9. Only after the identity matrix passes and the data-access model is approved, set `IDENTITY_GATE_PASSED=true` in TEST Script Properties.
-10. Test sign-in with a valid code, invalid code, inactive employee and rotated code while the data gate remains closed. Only after sign-in isolation passes should the gate be enabled in TEST.
-11. Test that the labeller sees only rows assigned to their normalized email, then test access denial, missing mappings, partial project failures and source-sheet errors.
-12. Run the editor-only helper `initializeAuthStorage_()` to create `Employee_Credentials`. For each active test employee, run `provisionEmployeeAccessCode_('email@example.com')` from the Apps Script editor and copy the generated one-time code from the private execution log. Deliver it privately; never put codes in spreadsheet rows, GitHub, or chat.
-13. The helper names end with `_` intentionally and must not be exposed as browser-callable APIs. The stored credential is a hash; reissuing a code invalidates that employee's existing sessions.
-11. After identity and Phase 1 checks pass, sign in as the TEST admin and use **Initialize attendance storage** in the dashboard. This creates only the five app-owned attendance/leave tabs in the private TEST master. Existing tabs with different headers are not overwritten.
-12. Test attendance and leave actions using synthetic users and dates only. Keep `IDENTITY_GATE_PASSED=false` until the Phase 0 identity matrix has passed.
+7. Run editor-only helper initializeAuthStorage_ to create the private Employee_Credentials tab.
+8. Add one active synthetic admin and one active synthetic labeller row in Employees. For each employee, set Script Property ACCESS_CODE_FOR_EMAIL to that email, run editor-only provisionEmployeeAccessCode_, then copy the one-time code from the private execution log. The helper removes the temporary property after issuing the code. Deliver codes privately.
+9. Test sign-in with valid and invalid codes, inactive users, sign-out and code rotation while IDENTITY_GATE_PASSED=false. Task and attendance data must stay blocked during these checks.
+10. Deploy the TEST web app as the script owner, restricted to signed-in Google accounts (not anonymous). Open the versioned /exec URL and sign in with the employee email + access code.
+11. Only after the access-code tests pass, set IDENTITY_GATE_PASSED=true in TEST Script Properties. Then test that a labeller sees only rows assigned to their normalized email, missing mappings, partial project failures and source-sheet errors.
+12. Sign in as the TEST admin and use Initialize attendance storage. This creates only the five app-owned attendance/leave tabs in the private TEST master; existing tabs with mismatched headers are not overwritten.
+13. Test attendance and leave actions using synthetic users and dates only.
 
 ## Personal Gmail authentication
 
