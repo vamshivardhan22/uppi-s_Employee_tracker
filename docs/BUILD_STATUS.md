@@ -6,6 +6,8 @@ Last updated: 2026-10-26
 
 Phase 0/1 starter code is committed on the development branch. It has not been deployed to Apps Script or tested against live Google accounts or real spreadsheets. GitHub commit success is not runtime verification.
 
+Development must follow the agreed six-phase plan. Do not use unrelated repository references or introduce features outside the agreed project requirements.
+
 ## Implemented in source
 
 - Apps Script web-app entry point and responsive HTML shell.
@@ -38,6 +40,10 @@ Phase 0/1 starter code is committed on the development branch. It has not been d
 6. **Reads are not chunked yet.** Each configured tab is read in one `getDataRange()` call. Large projects need load testing and a chunked scanner before wider rollout.
 7. **Partial totals can still be displayed.** The UI now labels them as partial and lists project failures. Do not use partial totals for decisions.
 8. **No automated Apps Script test runner is included.** Static inspection cannot prove deployment, authorization, quota, or Google Sheets runtime behavior.
+
+## Agreed next implementation step
+
+Continue within the existing development branch in phase order. After Phase 0/1 identity and read-only behavior have been verified in TEST, implement Phase 2 attendance and breaks using the private master spreadsheet, server-side timestamps, locking, and duplicate-action protection. Do not skip the identity blocker or enable production writes as a shortcut.
 
 ## Release rule
 
