@@ -50,7 +50,7 @@ This document describes the architecture agreed for this project. Implement the 
 - The editor-only initialization helper creates `Employee_Credentials` in the private master, storing one SHA-256 hash per active employee.
 - The editor-only provisioning helper creates/rotates a unique per-employee access code and logs it once. These helpers end in `_` so they are not exposed through `google.script.run`.
 - The admin-only initialization action creates `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests` in the private master spreadsheet. Existing tabs with mismatched headers fail closed rather than being overwritten.
-- Attendance actions do not accept an employee email from the browser. The server derives the active user and checks the employee record for each call.
+- Attendance actions do not accept an employee email from the browser. The server resolves the employee from the validated session token and rechecks the employee and credential records for each call.
 - `Attendance_Events` is append-only from application code. Session and break summary rows are updated as the current state; request records support safe replay of a previously successful request.
 - The script lock serializes actions within this Apps Script project, but Google Sheets does not provide a multi-tab transaction. Runtime failure-injection tests are required before production use.
 - Work dates and leave dates are stored as ISO `YYYY-MM-DD` strings to avoid browser and spreadsheet timezone shifts; event timestamps remain server-generated date-time values formatted in `Asia/Kolkata`.
