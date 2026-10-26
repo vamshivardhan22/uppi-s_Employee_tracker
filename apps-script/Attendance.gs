@@ -62,7 +62,7 @@ function attendanceSheets_() {
     const values = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getDisplayValues()[0];
     const actual = values.map(value => String(value || '').trim());
     const expected = ATTENDANCE.HEADERS[name];
-    if (expected.some((header, index) => actual[index] !== header) || actual.length < expected.length) {
+    if (expected.some((header, index) => actual[index] !== header) || actual.length !== expected.length) {
       throw new Error('Attendance tab "' + name + '" has an unexpected header layout. Do not rename or reorder its columns.');
     }
     result[name] = sheet;
@@ -357,6 +357,14 @@ function attendanceSubmitLeaveRequest(payload, requestId) {
     }
     const today = attendanceDateKey_(now);
     if (end < today) throw new Error('Leave requests cannot be submitted for dates that have already passed.');
+    const existingLeave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).find(row => {
+      if (row.Email !== user.email || !['PENDING', 'APPROVED'].includes(row.Status)) return false;
+      if (!(row['Start Date'] instanceof Date) || !(row['End Date'] instanceof Date)) return false;
+      const existingStart = attendanceDateKey_(row['Start Date']);
+      const existingEnd = attendanceDateKey_(row['End Date']);
+      return start <= existingEnd && end >= existingStart;
+    });
+    if (existingLeave) throw new Error('You already have a pending or approved leave request overlapping these dates.');
     const reason = String(data.reason || '').trim().slice(0, 500);
     const leaveId = Utilities.getUuid();
     const dateToSheetDate = text => new Date(text + 'T00:00:00');
@@ -434,16 +442,17 @@ function closeStaleAttendanceSessions() {
     attendanceRows_(sheets[ATTENDANCE.SHEETS.SESSIONS]).forEach(session => {
       if (session.Status !== 'OPEN' || !(session['Clock In At'] instanceof Date) ||
           session['Clock In At'].getTime() > cutoff) return;
+      const closeAt = new Date(session['Clock In At'].getTime() + maxHours * 60 * 60 * 1000);
       const openBreak = attendanceOpenBreak_(sheets, session['Session ID']);
       if (openBreak) {
         attendanceUpdate_(sheets[ATTENDANCE.SHEETS.BREAKS], openBreak.__rowNumber, {
-          'End At': now, Status: 'AUTO_CLOSED'
+          'End At': closeAt, Status: 'AUTO_CLOSED'
         });
         attendanceWriteEvent_(sheets, session.Email, session['Session ID'], Utilities.getUuid(),
           'BREAK_AUTO_CLOSED', 'Automatically closed with stale attendance session.', now);
       }
       attendanceUpdate_(sheets[ATTENDANCE.SHEETS.SESSIONS], session.__rowNumber, {
-        'Clock Out At': now, Status: 'AUTO_CLOSED', 'Auto Closed At': now,
+        'Clock Out At': closeAt, Status: 'AUTO_CLOSED', 'Auto Closed At': now,
         'Auto Close Reason': 'Exceeded configured maximum session duration (' + maxHours + ' hours).',
         'Updated At': now
       });
