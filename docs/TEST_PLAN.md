@@ -20,7 +20,8 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Keep Script Property `IDENTITY_GATE_PASSED=false` while setting up codes.
 - [ ] Create `Employee_Credentials` by running editor-only `initializeAuthStorage_()` after `MASTER_SPREADSHEET_ID` points to TEST.
 - [ ] Add exactly one active Employees row per test account, with role `admin` or `labeller`.
-- [ ] Run editor-only `provisionEmployeeAccessCode_('email@example.com')` for each synthetic test employee. Deliver the logged one-time code privately; do not store the plaintext in Sheets or GitHub.
+- [ ] For each synthetic test employee, set Script Property `ACCESS_CODE_FOR_EMAIL` to their email and run editor-only `provisionEmployeeAccessCode_()`; the helper deletes the temporary property after issuing the code.
+- [ ] Deliver the logged one-time code privately; do not store the plaintext in Sheets or GitHub.
 - [ ] Correct email + correct code signs in; wrong code, malformed code, unknown employee, inactive employee and duplicate employee rows fail closed with no role/data leakage.
 - [ ] The login response returns a random session token; the server stores session state in Script Cache and does not accept a client-supplied role.
 - [ ] No data API returns task/attendance data while the gate is false, even with a valid login token.
