@@ -44,12 +44,14 @@ The master spreadsheet ID is the portion between `/d/` and `/edit` in its browse
 
 ## 3. Test Phase 0 first — keep the gate closed
 
-1. In Apps Script, select `doGet` and use **Deploy → Test deployments → Web app**. Follow Google's prompts and copy the test URL. The test URL commonly ends in `/dev` and is intended for users who have edit access to the script.
-2. Open that URL while signed in as a synthetic test admin; click **Check identity** and compare the returned active-user email with the Google account used.
-3. Repeat as a synthetic labeller in a separate browser profile/session that has the required script access.
-4. If either identity is blank or incorrect, STOP. Leave `IDENTITY_GATE_PASSED=false`. Do not try to substitute the script owner's email or bypass the gate.
+1. Keep `IDENTITY_GATE_PASSED=false`.
+2. In Apps Script, select **Deploy → New deployment → Web app**. Choose the intended test access audience and execution identity. Use only the audience allowed by your organization's policy; do not make the app public for convenience.
+3. Deploy this TEST project and copy its versioned `/exec` URL. Using **Deploy → Test deployments** creates a `/dev` URL that is restricted to script editors; that is useful for a quick editor smoke test, but it does **not** prove identity behavior for your intended `/exec` audience.
+4. Open the deployed `/exec` URL while signed in as the synthetic test admin; click **Check identity** and compare the returned active-user email with the Google account used.
+5. Repeat with the synthetic labeller using the intended real access path (for example, a separate browser profile). If the intended account cannot open the app under the chosen deployment settings, record that as a failed gate.
+6. If either identity is blank or incorrect, STOP. Leave `IDENTITY_GATE_PASSED=false`. Do not substitute the script owner's email or bypass the gate.
 
-Google's deployment access options and identity behavior depend on the selected deployment and account setup. Choose only an audience the organization intends to permit. Do not deploy publicly for convenience.
+Google documents that web-app deployment settings affect how the app runs and which users can access it. The exact settings must match the intended usage; a successful `/dev` editor test alone is insufficient.
 
 ## 4. Only after the identity matrix passes
 
