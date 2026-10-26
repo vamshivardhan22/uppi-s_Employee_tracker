@@ -27,6 +27,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
 - Admin approve/reject actions for leave requests; labellers can only list their own requests.
 - Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
+- In-memory mocked verification: combined Apps Script syntax and dashboard inline JavaScript syntax passed; 15 attendance/leave logic checks passed. See `docs/VERIFICATION_LOG.md` for exact coverage and limitations.
 
 ## Not implemented
 
