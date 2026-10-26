@@ -90,4 +90,4 @@ Leave types supported by the current implementation are full day, half day (AM/P
 - Do not add attendance, email reminders, triggers or admin-write actions until their phase is implemented and tested.
 - Before a production pilot, test privacy isolation with at least two separate synthetic users and review current Apps Script quotas and identity behavior.
 
-See [Architecture](docs/ARCHITECTURE.md), [Build status](docs/BUILD_STATUS.md) and [Test plan](docs/TEST_PLAN.md).
+See [Architecture](docs/ARCHITECTURE.md), [Build status](docs/BUILD_STATUS.md), [Test plan](docs/TEST_PLAN.md) and [Verification log](docs/VERIFICATION_LOG.md).
