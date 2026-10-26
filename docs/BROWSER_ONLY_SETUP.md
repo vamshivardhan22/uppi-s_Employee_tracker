@@ -42,24 +42,34 @@ In the Apps Script editor, open **Project Settings → Script Properties** and s
 
 The master spreadsheet ID is the portion between `/d/` and `/edit` in its browser URL. Keep the master private; do not put its ID in HTML or share the sheet with labellers.
 
-## 3. Test Phase 0 first — keep the gate closed
+## 3. Set up app-level authentication while the data gate is closed
 
-1. Keep `IDENTITY_GATE_PASSED=false`.
-2. In Apps Script, select **Deploy → New deployment → Web app**. Choose the intended test access audience and execution identity. Use only the audience allowed by your organization's policy; do not make the app public for convenience.
-3. Deploy this TEST project and copy its versioned `/exec` URL. Using **Deploy → Test deployments** creates a `/dev` URL that is restricted to script editors; that is useful for a quick editor smoke test, but it does **not** prove identity behavior for your intended `/exec` audience.
-4. Open the deployed `/exec` URL while signed in as the synthetic test admin; click **Check identity** and compare the returned active-user email with the Google account used.
-5. Repeat with the synthetic labeller using the intended real access path (for example, a separate browser profile). If the intended account cannot open the app under the chosen deployment settings, record that as a failed gate.
-6. If either identity is blank or incorrect, STOP. Leave `IDENTITY_GATE_PASSED=false`. Do not substitute the script owner's email or bypass the gate.
+1. Keep Script Property IDENTITY_GATE_PASSED set to false.
+2. Add an active admin row and a synthetic active labeller row to Employees. Their Role values must be exactly admin and labeller.
+3. In the Apps Script function selector, run initializeAuthStorage_. It creates Employee_Credentials inside the private master spreadsheet.
+4. In Project Settings → Script Properties, set ACCESS_CODE_FOR_EMAIL to the admin's email. Return to the code editor, run provisionEmployeeAccessCode_, and copy the one-time code from the private execution log.
+5. Repeat step 4 with the labeller's email. The helper deletes ACCESS_CODE_FOR_EMAIL after issuing a code. Deliver each code through a separate private channel. Do not put plaintext codes in Sheets, GitHub or chat.
+6. These helpers end in an underscore intentionally. Keep them editor-only; do not rename them to public browser-callable functions.
 
-Google documents that web-app deployment settings affect how the app runs and which users can access it. The exact settings must match the intended usage; a successful `/dev` editor test alone is insufficient.
+The app uses app-level access-code authentication for personal Gmail users. The email is a lookup key, not proof that the browser is logged into that exact Google account. This is not Google SSO. Do not share the private master spreadsheet with labellers.
 
-## 4. Only after the identity matrix passes
+## 4. Deploy and verify Phase 0
 
-1. Populate the TEST master configuration with the synthetic accounts, project, access row and column mappings.
-2. Set `IDENTITY_GATE_PASSED=true` in the TEST Script Properties only after identity passed in both sessions.
-3. Open the test web app as the synthetic labeller. Confirm they see only their mapped task rows and cannot see the other user's rows.
-4. Sign in as the TEST admin and use **Initialize attendance storage**. This creates the five app-owned tabs: `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests`. It must not overwrite existing tabs with different headers.
-5. Test clock-in/out, break actions, leave requests and admin leave review using only synthetic data.
+1. Use Deploy → New deployment → Web app. Set Execute as to the script owner so that the app can read the private master and project task sheets using the owner's permissions.
+2. Restrict Who has access to signed-in Google accounts (the option wording may be Anyone with Google account). Do not allow anonymous/public access.
+3. Deploy and copy the versioned /exec URL. The /dev test URL is restricted to script editors and does not replace testing the intended deployed access path.
+4. Open the app and sign in using the admin email and private access code. While IDENTITY_GATE_PASSED is false, sign-in may succeed but task/attendance data must remain blocked.
+5. Test an incorrect code and a disabled/inactive employee. Both must fail closed without exposing task data.
+6. Rotate the labeller's access code and confirm any previous session for that employee is rejected. Test sign-out as well.
+7. Keep the gate false if any authentication or privacy test fails.
+
+## 5. Enable TEST data after authentication tests pass
+
+1. Create a separate fake project spreadsheet with a task tab and synthetic rows. Configure Projects, Access and Column_Map with synthetic IDs and headers.
+2. Only after valid/invalid code, role, session and sign-out tests pass, set IDENTITY_GATE_PASSED to true in TEST Script Properties.
+3. Sign in as the synthetic labeller and confirm My Work returns only their mapped rows.
+4. Sign in as the TEST admin and use Initialize attendance storage. This creates Attendance_Sessions, Attendance_Events, Attendance_Breaks, Leave_Requests and Attendance_Requests. It must not overwrite tabs with unexpected headers.
+5. Test clock-in/out, breaks, leave requests and admin review with synthetic data.
 
 ## 5. What to report back
 
