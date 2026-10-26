@@ -96,7 +96,7 @@ function initializeAttendanceStorage() {
       }
       const actual = sheet.getRange(1, 1, 1, Math.max(lastColumn, 1)).getDisplayValues()[0]
         .map(value => String(value || '').trim());
-      if (expected.some((header, index) => actual[index] !== header) || actual.length < expected.length) {
+      if (expected.some((header, index) => actual[index] !== header) || actual.length !== expected.length) {
         throw new Error('Existing tab "' + name + '" has different headers. No data was overwritten.');
       }
     });
