@@ -77,7 +77,7 @@ docs/
 
 ## Personal Gmail authentication
 
-Because personal Gmail accounts do not share a Workspace domain, the current deployment cannot reliably use Apps Script's active-user email as the visitor identity when executed as the app owner. The application therefore uses a unique per-employee access code as its credential. The email is an account lookup, not proof by itself that the browser is signed in to that exact Google account. Keep the master private and distribute codes through a separate private channel. This avoids sharing the master spreadsheet with labellers and avoids sending an email on every login.
+Because personal Gmail accounts do not share a Workspace domain, the current deployment cannot reliably use Apps Script's active-user email as the visitor identity when executed as the app owner. The application therefore uses a unique per-employee access code as its credential. The email is an account lookup, not proof by itself that the browser is signed in to that exact Google account. This is app-level authentication, not Google SSO. Keep the master private and distribute codes through a separate private channel. This avoids sharing the master spreadsheet with labellers and avoids sending an email on every login.
 
 The property `IDENTITY_GATE_PASSED` is retained for compatibility but now acts as the TEST application-data gate: keep it `false` while preparing and testing access codes. Login can be tested while it is false; My Work and attendance endpoints remain blocked. After the admin and labeller access-code checks pass, the TEST admin may set it to `true` for data-flow testing.
 
