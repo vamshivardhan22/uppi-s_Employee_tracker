@@ -41,10 +41,16 @@ apps-script/
   UserApi.gs
   Attendance.gs
   Index.html
+browser-deploy/
+  Main.gs
+  Index.html
+  appsscript.json
 docs/
   ARCHITECTURE.md
   BUILD_STATUS.md
   TEST_PLAN.md
+  VERIFICATION_LOG.md
+  BROWSER_ONLY_SETUP.md
 ```
 
 ## TEST setup
