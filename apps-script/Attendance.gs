@@ -195,8 +195,7 @@ function attendanceWithAction_(action, requestId, operation) {
 
 function attendanceOpenSession_(sheets, email, dateKey) {
   return attendanceRows_(sheets[ATTENDANCE.SHEETS.SESSIONS]).find(row =>
-    row.Email === email && row.Status === 'OPEN' && row['Work Date'] instanceof Date &&
-    attendanceDateKey_(row['Work Date']) === dateKey);
+    row.Email === email && row.Status === 'OPEN' && row['Work Date'] === dateKey);
 }
 
 function attendanceCurrentSession_(sheets, email) {
@@ -216,8 +215,8 @@ function attendanceStatusForUser_(user, sheets) {
   const openSession = attendanceCurrentSession_(sheets, user.email) || null;
   const openBreak = openSession ? attendanceOpenBreak_(sheets, openSession['Session ID']) : null;
   const leave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).filter(row =>
-    row.Email === user.email && row['Start Date'] instanceof Date &&
-    attendanceDateKey_(row['Start Date']) === today);
+    row.Email === user.email && typeof row['Start Date'] === 'string' &&
+    typeof row['End Date'] === 'string' && row['Start Date'] <= today && row['End Date'] >= today);
   return {
     ok: true,
     user: { email: user.email, displayName: user.displayName, role: user.role },
@@ -231,13 +230,13 @@ function attendanceStatusForUser_(user, sheets) {
       status: session.Status
     } : null,
     hasOpenSession: Boolean(openSession),
-    openSessionDate: openSession && openSession['Work Date'] instanceof Date ? attendanceDateKey_(openSession['Work Date']) : '',
+    openSessionDate: openSession ? String(openSession['Work Date'] || '') : '',
     openBreak: openBreak ? { breakId: openBreak['Break ID'], type: openBreak['Break Type'],
       startAt: openBreak['Start At'] instanceof Date ? attendanceTimestamp_(openBreak['Start At']) : '' } : null,
     todayLeaveRequests: leave.map(row => ({
       leaveId: row['Leave ID'], type: row['Leave Type'], status: row.Status,
-      startDate: row['Start Date'] instanceof Date ? attendanceDateKey_(row['Start Date']) : '',
-      endDate: row['End Date'] instanceof Date ? attendanceDateKey_(row['End Date']) : ''
+      startDate: String(row['Start Date'] || ''),
+      endDate: String(row['End Date'] || '')
     }))
   };
 }
@@ -254,7 +253,7 @@ function attendanceClockIn(requestId) {
     const today = attendanceDateKey_(now);
     const existing = attendanceCurrentSession_(sheets, user.email);
     if (existing) {
-      const existingDate = existing['Work Date'] instanceof Date ? attendanceDateKey_(existing['Work Date']) : '';
+      const existingDate = String(existing['Work Date'] || '');
       if (existingDate !== today) {
         throw new Error('A previous attendance session is still open. Ask an administrator to review and close it before clocking in again.');
       }
@@ -262,7 +261,7 @@ function attendanceClockIn(requestId) {
     }
     const sessionId = Utilities.getUuid();
     attendanceAppend_(sheets[ATTENDANCE.SHEETS.SESSIONS], {
-      'Session ID': sessionId, Email: user.email, 'Work Date': new Date(today + 'T00:00:00'),
+      'Session ID': sessionId, Email: user.email, 'Work Date': today,
       'Clock In At': now, 'Clock Out At': '', Status: 'OPEN',
       'Auto Closed At': '', 'Auto Close Reason': '', 'Created At': now, 'Updated At': now
     });
@@ -360,18 +359,17 @@ function attendanceSubmitLeaveRequest(payload, requestId) {
     if (type === 'half_day' && start !== end) throw new Error('Half-day leave must be requested for one date.');
     const existingLeave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).find(row => {
       if (row.Email !== user.email || !['PENDING', 'APPROVED'].includes(row.Status)) return false;
-      if (!(row['Start Date'] instanceof Date) || !(row['End Date'] instanceof Date)) return false;
-      const existingStart = attendanceDateKey_(row['Start Date']);
-      const existingEnd = attendanceDateKey_(row['End Date']);
+      if (typeof row['Start Date'] !== 'string' || typeof row['End Date'] !== 'string') return false;
+      const existingStart = row['Start Date'];
+      const existingEnd = row['End Date'];
       return start <= existingEnd && end >= existingStart;
     });
     if (existingLeave) throw new Error('You already have a pending or approved leave request overlapping these dates.');
     const reason = String(data.reason || '').trim().slice(0, 500);
     const leaveId = Utilities.getUuid();
-    const dateToSheetDate = text => new Date(text + 'T00:00:00');
     attendanceAppend_(sheets[ATTENDANCE.SHEETS.LEAVE], {
-      'Leave ID': leaveId, Email: user.email, 'Start Date': dateToSheetDate(start),
-      'End Date': dateToSheetDate(end), 'Leave Type': type, 'Partial Period': period,
+      'Leave ID': leaveId, Email: user.email, 'Start Date': start,
+      'End Date': end, 'Leave Type': type, 'Partial Period': period,
       'Start Time': startTime, 'End Time': endTime, Reason: reason, Status: 'PENDING',
       'Requested At': now, 'Reviewed By': '', 'Reviewed At': '', 'Review Note': ''
     });
@@ -392,8 +390,8 @@ function getAttendanceLeaveRequests() {
     role: user.role,
     rows: visible.map(row => ({
       leaveId: row['Leave ID'], email: user.role === 'admin' ? row.Email : '',
-      startDate: row['Start Date'] instanceof Date ? attendanceDateKey_(row['Start Date']) : '',
-      endDate: row['End Date'] instanceof Date ? attendanceDateKey_(row['End Date']) : '',
+      startDate: String(row['Start Date'] || ''),
+      endDate: String(row['End Date'] || ''),
       leaveType: row['Leave Type'], partialPeriod: row['Partial Period'],
       startTime: row['Start Time'], endTime: row['End Time'], reason: row.Reason,
       status: row.Status, requestedAt: row['Requested At'] instanceof Date ? attendanceTimestamp_(row['Requested At']) : ''
