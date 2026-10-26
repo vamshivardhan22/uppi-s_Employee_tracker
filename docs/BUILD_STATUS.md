@@ -13,6 +13,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Apps Script web-app entry point and responsive HTML shell.
 - Identity-only diagnostic endpoint that intentionally reads no spreadsheet data.
 - Identity gate closed unless Script Property `IDENTITY_GATE_PASSED` is exactly `true`.
+- `getMyWork()` now checks the identity gate before opening the master spreadsheet or reading task data.
 - Server-side active employee and role validation.
 - Server-side project access filtering and source-sheet reads by configured tab name.
 - Server-side filtering by the authenticated user's normalized email; no browser email parameter.
@@ -43,7 +44,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 
 ## Agreed next implementation step
 
-Continue within the existing development branch in phase order. After Phase 0/1 identity and read-only behavior have been verified in TEST, implement Phase 2 attendance and breaks using the private master spreadsheet, server-side timestamps, locking, and duplicate-action protection. Do not skip the identity blocker or enable production writes as a shortcut.
+Continue within the existing development branch in phase order. The next Phase 0/1 hardening step is to validate all data endpoints remain locked when the identity gate is closed. Once the deployed identity matrix passes and read-only behavior is verified in TEST, implement Phase 2 attendance and breaks using the private master spreadsheet, server-side timestamps, locking, and duplicate-action protection. Do not skip the identity blocker or enable production writes as a shortcut.
 
 ## Release rule
 
