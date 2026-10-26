@@ -11,7 +11,10 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 ## Implemented in source
 
 - Apps Script web-app entry point and responsive HTML shell.
-- Identity-only diagnostic endpoint that intentionally reads no spreadsheet data.
+- Safe status endpoint that reveals no active-user or script-owner identity.
+- Access-code login for personal Gmail users, with high-entropy codes stored only as SHA-256 hashes in a private `Employee_Credentials` tab.
+- Short-lived random server-cache sessions; data endpoints recheck active employee status and credential hash on each request.
+- Editor-only access-code initialization/provisioning helpers, not exposed as browser-callable functions.
 - Identity gate closed unless Script Property `IDENTITY_GATE_PASSED` is exactly `true`.
 - `getMyWork()` now checks the identity gate before opening the master spreadsheet or reading task data.
 - Server-side active employee and role validation.
@@ -43,7 +46,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 
 ## Known limitations and release blockers
 
-1. **Identity is deployment-dependent.** `Session.getActiveUser().getEmail()` can be blank depending on account type and deployment. Never substitute `getEffectiveUser()` as the visitor identity.
+1. **Personal Gmail authentication uses access codes.** The email is a lookup key, not proof of Google account identity. Codes must be high entropy and distributed privately; this is app-level authentication, not Google SSO.
 2. **Status semantics are provisional.** The current completed-status list is proposed in the build plan and must be confirmed against the actual task workflow before metrics are used operationally.
 3. **Task counts are source rows.** Distinct sets are counted by Project ID + Dataset Set ID. Confirm this is the intended counting unit.
 4. **Date fields are treated as date-only.** If a source column contains date-time values, this serializer intentionally presents the date portion only; confirm the source's actual semantics.
