@@ -4,11 +4,11 @@ A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed d
 
 ## Build status
 
-The repository currently contains the Phase 0/1 starter implementation. It is **not a completed or production-verified application**.
+The repository contains the Phase 0/1 starter and Phase 2 attendance/leave implementation. It is **not a completed or production-verified application**.
 
 - **Phase 0:** verify the deployed app's active-user identity without reading spreadsheet data.
 - **Phase 1:** deliver the authenticated, read-only My Work dashboard.
-- **Phase 2:** attendance, leave, login/logout and break tracking.
+- **Phase 2:** attendance, leave, login/logout and break tracking (code added; TEST runtime verification is still pending).
 - **Phase 3:** issue scanning, turnaround-time checks, reminders and quota-aware scheduled processing.
 - **Phase 4:** admin People/Projects management, team dashboard, reports, charts and snapshots.
 - **Phase 5:** privacy, concurrency, edge-case, load, quota, backup and restore verification.
@@ -39,6 +39,7 @@ apps-script/
   SheetsRepository.gs
   Metrics.gs
   UserApi.gs
+  Attendance.gs
   Index.html
 docs/
   ARCHITECTURE.md
@@ -64,6 +65,8 @@ docs/
 8. Open the deployed `/exec` URL as a test admin and a test labeller in separate sessions. Confirm `activeUserEmail` is nonblank and exactly matches each signed-in account. If blank or incorrect, STOP; keep the gate closed.
 9. Only after the identity matrix passes and the data-access model is approved, set `IDENTITY_GATE_PASSED=true` in TEST Script Properties.
 10. Test that the labeller sees only rows assigned to their normalized email, then test access denial, missing mappings, partial project failures and source-sheet errors.
+11. After identity and Phase 1 checks pass, sign in as the TEST admin and use **Initialize attendance storage** in the dashboard. This creates only the five app-owned attendance/leave tabs in the private TEST master. Existing tabs with different headers are not overwritten.
+12. Test attendance and leave actions using synthetic users and dates only. Keep `IDENTITY_GATE_PASSED=false` until the Phase 0 identity matrix has passed.
 
 ## Required source mappings
 
@@ -72,6 +75,12 @@ Phase 1 requires canonical mappings for `Dataset Set Id`, `Annotator Mail` and `
 Optional mappings: `Assigned Date`, `Submitted Date`, `Approved Objects`, `Rejected Objects`, `Reviewer Rejected Count`, and `Hold Note`.
 
 The canonical names are mapping keys; each `Sheet Header` value must match the header in its configured source tab (case-insensitive matching is used).
+
+## Phase 2 attendance storage
+
+The Phase 2 module stores attendance in the private master spreadsheet, not in the project task sheets. The admin initialization action creates `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests`. Event records are append-only; request IDs make repeated identical calls return the original result. The server uses a script lock around each action.
+
+Leave types supported by the current implementation are full day, half day (AM/PM), and short leave (single date with a start/end time). Requests begin as `PENDING`; admins can approve or reject them. The automatic stale-session closure function requires an explicitly approved `ATTENDANCE_MAX_SESSION_HOURS` Script Property (1–24 hours); no scheduled trigger is enabled yet. Phase 3 owns scheduled scanning/trigger setup.
 
 ## Security and release rules
 
