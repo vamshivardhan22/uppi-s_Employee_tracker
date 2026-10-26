@@ -356,7 +356,8 @@ function attendanceSubmitLeaveRequest(payload, requestId) {
       throw new Error('Start and end times are only used for short leave.');
     }
     const today = attendanceDateKey_(now);
-    if (end < today) throw new Error('Leave requests cannot be submitted for dates that have already passed.');
+    if (start < today) throw new Error('Leave requests cannot start on dates that have already passed.');
+    if (type === 'half_day' && start !== end) throw new Error('Half-day leave must be requested for one date.');
     const existingLeave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).find(row => {
       if (row.Email !== user.email || !['PENDING', 'APPROVED'].includes(row.Status)) return false;
       if (!(row['Start Date'] instanceof Date) || !(row['End Date'] instanceof Date)) return false;
