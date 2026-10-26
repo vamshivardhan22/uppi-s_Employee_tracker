@@ -30,7 +30,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
 - Admin approve/reject actions for leave requests; labellers can only list their own requests.
 - Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
-- In-memory mocked verification: combined Apps Script syntax and dashboard inline JavaScript syntax passed; 20 attendance/leave behavior checks passed against the latest bundle. See `docs/VERIFICATION_LOG.md` for exact coverage and limitations.
+- In-memory mocked verification: combined Apps Script syntax and dashboard inline JavaScript syntax passed; 28 access-code, session, task-isolation, attendance and leave behavior checks passed against the current modular source. See `docs/VERIFICATION_LOG.md` for exact coverage and limitations.
 - Browser-only deployment bundle added under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML are verified byte-for-byte against the current modular source.
 - `docs/BROWSER_ONLY_SETUP.md` describes setup and TEST deployment using only a browser; real Apps Script identity and spreadsheet checks remain outstanding.
 
