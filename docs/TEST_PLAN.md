@@ -15,21 +15,25 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Duplicate/missing headers produce a visible error.
 - [ ] Configured source spreadsheet IDs and tab names are correct; script owner can read each source.
 
-## B. Identity gate — mandatory before task data
+## B. Access-code authentication gate — mandatory before task data
 
-- [ ] Deploy the TEST web app for the intended audience and open its `/exec` URL as a test admin.
-- [ ] Record active-user email, timestamp and deployment audience. The effective-user identity is logged server-side in Apps Script execution logs and is not exposed in the public diagnostic response.
-- [ ] Repeat in a separate browser/incognito session as a test labeller.
-- [ ] Active-user email is nonblank and exactly matches the signed-in account in both sessions.
-- [ ] Active-user identity is not confused with the script owner's effective identity.
-- [ ] Repeat after creating a new deployment version.
-- [ ] If active-user email is blank or wrong for either account, keep the gate closed and stop.
+- [ ] Keep Script Property `IDENTITY_GATE_PASSED=false` while setting up codes.
+- [ ] Create `Employee_Credentials` by running editor-only `initializeAuthStorage_()` after `MASTER_SPREADSHEET_ID` points to TEST.
+- [ ] Add exactly one active Employees row per test account, with role `admin` or `labeller`.
+- [ ] Run editor-only `provisionEmployeeAccessCode_('email@example.com')` for each synthetic test employee. Deliver the logged one-time code privately; do not store the plaintext in Sheets or GitHub.
+- [ ] Correct email + correct code signs in; wrong code, malformed code, unknown employee, inactive employee and duplicate employee rows fail closed with no role/data leakage.
+- [ ] The login response returns a random session token; the server stores session state in Script Cache and does not accept a client-supplied role.
+- [ ] No data API returns task/attendance data while the gate is false, even with a valid login token.
+- [ ] Rotate a code and confirm existing sessions for that employee are invalidated.
+- [ ] Confirm sign-out removes the server-side session.
+- [ ] Open the deployed TEST `/exec` URL with the intended “Google account required” audience. Verify app-level access code works with personal Gmail accounts; this is not Google SSO and does not prove the browser's Google session email matches the typed email.
+- [ ] Only after these checks pass, set `IDENTITY_GATE_PASSED=true` in TEST and proceed to the Phase 1/2 data tests.
 
 ## C. Authorization and privacy
 
 - [ ] With gate false, `getMyWork` cannot return task records.
 - [ ] Unknown, inactive, duplicate employee rows and invalid roles are denied.
-- [ ] Client changes cannot substitute another user's email; `getMyWork` accepts no email argument.
+- [ ] Client changes to the token, email, role or displayed UI cannot grant access; the server validates its cached session and loads the identity from the credential/employee records.
 - [ ] Only projects with an active Access row for the authenticated user are read.
 - [ ] Rows assigned to another email never appear; email matching trims surrounding whitespace and ignores case.
 - [ ] A source read failure is shown as an error and marks totals as partial.
