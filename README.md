@@ -20,7 +20,7 @@ Implementation must follow this sequence. Do not add unrelated systems, external
 
 - Existing project spreadsheets remain the task source of truth. The dashboard does not create a second task database or edit task rows.
 - A separate private master spreadsheet stores employee access, project configuration and app-owned records.
-- Server-side authorization derives identity from `Session.getActiveUser().getEmail()`. Browser-supplied email is never accepted as an authorization parameter.
+- The deployment does not rely on `Session.getActiveUser().getEmail()` to identify personal Gmail visitors. Each employee signs in with their Employees email and a unique, high-entropy access code; the backend verifies the code's SHA-256 hash from the private master and issues a short-lived server-cache session token. Email alone is never sufficient to authenticate.
 - Project access is checked server-side before project sheets are read.
 - Timezone: `Asia/Kolkata`.
 - Target: no additional software-license cost, subject to actual Google account type and service quotas.
@@ -64,9 +64,18 @@ docs/
 7. Deploy a **test** web app using the intended access audience. Do not assume Apps Script returns the visitor's email: behavior depends on account type and deployment settings.
 8. Open the deployed `/exec` URL as a test admin and a test labeller in separate sessions. Confirm `activeUserEmail` is nonblank and exactly matches each signed-in account. If blank or incorrect, STOP; keep the gate closed.
 9. Only after the identity matrix passes and the data-access model is approved, set `IDENTITY_GATE_PASSED=true` in TEST Script Properties.
-10. Test that the labeller sees only rows assigned to their normalized email, then test access denial, missing mappings, partial project failures and source-sheet errors.
+10. Test sign-in with a valid code, invalid code, inactive employee and rotated code while the data gate remains closed. Only after sign-in isolation passes should the gate be enabled in TEST.
+11. Test that the labeller sees only rows assigned to their normalized email, then test access denial, missing mappings, partial project failures and source-sheet errors.
+12. Run the editor-only helper `initializeAuthStorage_()` to create `Employee_Credentials`. For each active test employee, run `provisionEmployeeAccessCode_('email@example.com')` from the Apps Script editor and copy the generated one-time code from the private execution log. Deliver it privately; never put codes in spreadsheet rows, GitHub, or chat.
+13. The helper names end with `_` intentionally and must not be exposed as browser-callable APIs. The stored credential is a hash; reissuing a code invalidates that employee's existing sessions.
 11. After identity and Phase 1 checks pass, sign in as the TEST admin and use **Initialize attendance storage** in the dashboard. This creates only the five app-owned attendance/leave tabs in the private TEST master. Existing tabs with different headers are not overwritten.
 12. Test attendance and leave actions using synthetic users and dates only. Keep `IDENTITY_GATE_PASSED=false` until the Phase 0 identity matrix has passed.
+
+## Personal Gmail authentication
+
+Because personal Gmail accounts do not share a Workspace domain, the current deployment cannot reliably use Apps Script's active-user email as the visitor identity when executed as the app owner. The application therefore uses a unique per-employee access code as its credential. The email is an account lookup, not proof by itself that the browser is signed in to that exact Google account. Keep the master private and distribute codes through a separate private channel. This avoids sharing the master spreadsheet with labellers and avoids sending an email on every login.
+
+The property `IDENTITY_GATE_PASSED` is retained for compatibility but now acts as the TEST application-data gate: keep it `false` while preparing and testing access codes. Login can be tested while it is false; My Work and attendance endpoints remain blocked. After the admin and labeller access-code checks pass, the TEST admin may set it to `true` for data-flow testing.
 
 ## Required source mappings
 
