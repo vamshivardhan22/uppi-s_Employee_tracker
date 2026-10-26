@@ -4,7 +4,7 @@ Last updated: 2026-10-26
 
 ## Current repository state
 
-Phase 0/1 starter code is committed on the development branch. It has not been deployed to Apps Script or tested against live Google accounts or real spreadsheets. GitHub commit success is not runtime verification.
+Phase 0/1 starter code and Phase 2 attendance/leave code are committed on the development branch. It has not been deployed to Apps Script or tested against live Google accounts or real spreadsheets. GitHub commit success is not runtime verification.
 
 Development must follow the agreed six-phase plan. Do not use unrelated repository references or introduce features outside the agreed project requirements.
 
@@ -21,10 +21,17 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Visible project errors and a partial-data warning if one or more project reads fail.
 - Date-only values serialized in the configured project timezone to reduce browser timezone shifts.
 - Duplicate mapping and duplicate header checks.
+- Phase 2 attendance actions: clock-in, clock-out, start/end break, and leave requests for full day, half day (AM/PM) and short leave.
+- Admin-only initialization of five app-owned attendance tabs; mismatched existing headers fail closed.
+- Script-lock-protected actions with request IDs and replay records to reduce duplicate writes on retries.
+- Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
+- Admin approve/reject actions for leave requests; labellers can only list their own requests.
+- Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
 
 ## Not implemented
 
-- Attendance, full/half/short leave, login/logout, breaks or automatic session closure.
+- Automatic trigger installation for stale-session closure (planned in Phase 3); the closure function is not scheduled automatically.
+- Full admin attendance history/dashboard (Phase 4).
 - TAT calculations, issue lifecycle, duplicate task detection or validation reminders.
 - Scheduled scanner, email digests, quota-aware mail handling or heartbeat monitoring.
 - Admin People/Projects management or grant/revoke flows.
@@ -42,9 +49,9 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 7. **Partial totals can still be displayed.** The UI now labels them as partial and lists project failures. Do not use partial totals for decisions.
 8. **No automated Apps Script test runner is included.** Static inspection cannot prove deployment, authorization, quota, or Google Sheets runtime behavior.
 
-## Agreed next implementation step
+## Phase 2 verification status
 
-Continue within the existing development branch in phase order. The next Phase 0/1 hardening step is to validate all data endpoints remain locked when the identity gate is closed. Once the deployed identity matrix passes and read-only behavior is verified in TEST, implement Phase 2 attendance and breaks using the private master spreadsheet, server-side timestamps, locking, and duplicate-action protection. Do not skip the identity blocker or enable production writes as a shortcut.
+Phase 2 source has been added and read back from GitHub after push. It has **not** been executed in Apps Script. Required tests include identity/role denials, request replay, concurrent actions, break invariants, leave overlap/review, date/timezone handling, partial-write recovery, and stale-session closure. The maximum session duration must be approved and configured before stale-session closure is enabled. Do not call Phase 2 complete until the TEST checklist passes.
 
 ## Release rule
 
