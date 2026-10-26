@@ -4,13 +4,13 @@ This document describes the architecture agreed for this project. Implement the 
 
 ## Request flow — Phase 0/1
 
-1. `Index.html` loads and calls `getIdentityDiagnostic()`. This endpoint reads no spreadsheet data.
-2. The administrator verifies the identity result for the deployed audience. The identity gate remains closed by default.
-3. When the gate is explicitly enabled in TEST, `getBootstrap()` and `getMyWork()` derive the active-user email on the server.
-4. `Auth.gs` requires exactly one active Employees row and a valid role.
-5. `SheetsRepository.gs` resolves only active projects assigned through an active Access row and reads the configured source tab.
-6. `Metrics.gs` maps source headers, filters rows by the authenticated user's normalized email, and computes basic counts.
-7. `Index.html` displays only the server-filtered result. HTML text values are escaped before rendering.
+1. Index.html presents employee email + access-code sign-in; the status endpoint reads no spreadsheet data and exposes no active-user or owner identity.
+2. login(email, accessCode) checks an active Employees row and the private Employee_Credentials hash. The email alone is not authentication.
+3. Successful login returns a random session token; a server-side Script Cache entry binds that token to the employee, expiry and current credential hash.
+4. getBootstrap(token) validates the session and reports whether the app data gate is open. With the gate closed, no task or attendance data can be returned.
+5. Every data API validates the token, reloads the active employee/role and checks that the credential hash is unchanged.
+6. SheetsRepository.gs resolves only active projects assigned through an active Access row and reads the configured source tab.
+7. Metrics.gs filters rows by the server-authenticated employee email. Index.html escapes rendered values before display.
 
 ## Data ownership
 
