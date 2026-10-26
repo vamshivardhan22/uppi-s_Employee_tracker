@@ -42,7 +42,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Scheduled scanner, email digests, quota-aware mail handling or heartbeat monitoring.
 - Admin People/Projects management or grant/revoke flows.
 - My Reports, attendance history, charts, snapshots or performance/load tests.
-- Deployment audience verification, identity matrix, live Google account tests, production deployment or pilot.
+- Browser-based access-code tests, real Apps Script/Sheets runtime tests, production deployment or pilot.
 
 ## Known limitations and release blockers
 
@@ -61,4 +61,4 @@ Phase 2 source has been added and read back from GitHub after push. It has **not
 
 ## Release rule
 
-Keep the gate closed until the deployed `/exec` identity matrix passes for both admin and labeller accounts. Do not connect production data or enable scheduled triggers/outgoing emails until privacy isolation, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.
+Keep the data gate closed until valid/invalid access-code tests, role checks, session rotation/revocation and privacy isolation pass in the deployed TEST app. Do not connect production data or enable scheduled triggers/outgoing emails until privacy isolation, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.
