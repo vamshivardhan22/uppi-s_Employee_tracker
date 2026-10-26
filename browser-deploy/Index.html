@@ -1,0 +1,269 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--ink:#182230;--muted:#667085;--line:#e5eaf0;--blue:#2457d6;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+    main{max-width:1180px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:20px}
+    h1{font-size:23px;margin:0}h2{font-size:16px;margin:0 0 12px}.muted,.small{color:var(--muted)}.small{font-size:12px}
+    .panel,.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px;margin-bottom:14px}
+    .status{padding:12px;border-radius:10px;background:#eef4ff;color:#1d4ed8;margin:12px 0}.bad{background:#fef3f2;color:#b42318}.good{background:#ecfdf3;color:#067647}.warn{background:#fffaeb;color:#93370d}
+    button{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:10px 13px;font-weight:650;cursor:pointer;margin:4px 5px 4px 0}button:disabled{opacity:.55;cursor:wait}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}.label{font-size:12px;color:var(--muted)}.value{font-size:27px;font-weight:750;margin-top:5px}
+    .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:760px;background:#fff}
+    th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;color:var(--muted);background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}
+    .hidden{display:none!important}.error-list{color:#b42318;padding-left:20px}
+    @media(max-width:700px){main{padding:14px}header{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.value{font-size:24px}}
+  </style>
+</head>
+<body><main>
+  <header><div><h1>Labeller Dashboard</h1><div class="muted">Work overview · Phase 0/1</div></div><div id="phase" class="small">Identity check</div></header>
+  <section class="panel">
+    <h2>Secure sign-in check</h2>
+    <div class="muted">This check reads no employee or task records. Data remains locked until the administrator verifies the deployed identity behavior.</div>
+    <div id="status" class="status">Checking identity…</div><div id="details" class="small"></div>
+    <button id="identityButton" onclick="checkIdentity()">Check identity</button>
+    <button id="loadButton" onclick="loadWork()">Load my work</button>
+  </section>
+  <section id="work" class="hidden">
+    <div class="panel"><h2 id="welcome">My Work</h2><div class="muted">Read-only view of your mapped task rows.</div><button id="refreshButton" onclick="loadWork()">Refresh</button><span id="stamp" class="small"></span></div>
+    <div id="partialWarning" class="status warn hidden">Some projects could not be read. The figures below are partial and must not be treated as complete.</div>
+    <div class="cards">
+      <div class="card"><div class="label">Assigned tasks</div><div id="assigned" class="value">—</div></div>
+      <div class="card"><div class="label">Completed tasks</div><div id="completed" class="value">—</div></div>
+      <div class="card"><div class="label">Distinct dataset sets</div><div id="sets" class="value">—</div></div>
+      <div class="card"><div class="label">Assigned projects</div><div id="projects" class="value">—</div></div>
+    </div>
+    <div id="errors" class="panel hidden"></div>
+    <div class="panel"><h2>My task records</h2><div class="tablewrap"><table><thead><tr><th>Project</th><th>Dataset Set ID</th><th>Status</th><th>Assigned date</th><th>Submitted date</th><th>Approved</th><th>Rejected</th><th>Hold note</th></tr></thead><tbody id="rows"><tr><td colspan="8">No data loaded.</td></tr></tbody></table></div></div>
+    <section id="attendancePanel" class="panel">
+      <h2>Attendance & leave</h2>
+      <div class="muted">Actions use server timestamps in Asia/Kolkata. Your attendance records are private to your account; admins can review leave requests.</div>
+      <div id="attendanceStatus" class="status">Attendance status has not loaded.</div>
+      <div id="attendanceControls">
+        <button id="clockInButton" onclick="runAttendanceAction('CLOCK_IN')">Clock in</button>
+        <button id="clockOutButton" onclick="runAttendanceAction('CLOCK_OUT')">Clock out</button>
+        <label class="small" for="breakType">Break type</label>
+        <select id="breakType"><option value="tea">Tea</option><option value="lunch">Lunch</option><option value="personal">Personal</option><option value="other">Other</option></select>
+        <button id="breakStartButton" onclick="runAttendanceAction('BREAK_START')">Start break</button>
+        <button id="breakEndButton" onclick="runAttendanceAction('BREAK_END')">End break</button>
+        <button onclick="loadAttendance()">Refresh attendance</button>
+      </div>
+      <div id="attendanceAdminTools" class="hidden">
+        <button onclick="initializeAttendance()">Initialize attendance storage</button>
+        <div class="small">Creates only app-owned attendance tabs in the private master spreadsheet. Existing tabs with mismatched headers are not overwritten.</div>
+      </div>
+      <div class="panel">
+        <h2>Request leave</h2>
+        <div class="cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <label>Leave type<select id="leaveType" onchange="toggleLeaveFields()"><option value="full_day">Full day</option><option value="half_day">Half day</option><option value="short_leave">Short leave</option></select></label>
+          <label>Start date<input id="leaveStartDate" type="date" required></label>
+          <label>End date<input id="leaveEndDate" type="date" required></label>
+          <label id="partialPeriodWrap" class="hidden">Half-day period<select id="partialPeriod"><option value="AM">AM</option><option value="PM">PM</option></select></label>
+          <label id="shortStartWrap" class="hidden">Short-leave start time<input id="shortStartTime" type="time"></label>
+          <label id="shortEndWrap" class="hidden">Short-leave end time<input id="shortEndTime" type="time"></label>
+          <label style="grid-column:1/-1">Reason (optional)<input id="leaveReason" type="text" maxlength="500" placeholder="Add a short reason"></label>
+        </div>
+        <button onclick="submitLeave()">Submit leave request</button>
+      </div>
+      <div class="panel">
+        <h2>Leave requests</h2>
+        <button onclick="loadLeaveRequests()">Refresh requests</button>
+        <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>Date</th><th>Type</th><th>Status</th><th>Details</th><th id="leaveActionsHeader">Action</th></tr></thead><tbody id="leaveRows"><tr><td colspan="5">No requests loaded.</td></tr></tbody></table></div>
+      </div>
+    </section>
+  </section>
+  <p class="small">TEST starter only. Attendance, breaks, issue scanning, reminders, admin screens, charts and snapshots are later phases.</p>
+</main>
+<script>
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+    });
+  }
+  function setStatus(message, kind) {
+    var el=document.getElementById('status');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function checkIdentity() {
+    var button=document.getElementById('identityButton'); button.disabled=true;
+    google.script.run.withSuccessHandler(function(result) {
+      button.disabled=false;
+      document.getElementById('phase').textContent=result.identityGatePassed?'Phase 1 enabled':'Phase 0 · data locked';
+      document.getElementById('details').textContent='Active user: '+(result.activeUserEmail||'(blank)')+
+        ' · '+result.timestamp+' · '+result.timeZone;
+      if(!result.activeUserEmail) setStatus('STOP: active-user email is blank. Do not enable data access.','bad');
+      else if(!result.identityGatePassed) setStatus('Email returned. Compare it with the signed-in test account. Task data remains locked.','');
+      else setStatus('Identity gate enabled. Employee access is checked again server-side.','good');
+    }).withFailureHandler(function(error) {
+      button.disabled=false; setStatus(error.message||String(error),'bad');
+    }).getIdentityDiagnostic();
+  }
+  function displayDate(value) {
+    if(!value) return '—';
+    var text=String(value);
+    // Date-only values are intentionally kept as date-only to avoid timezone shifts.
+    if(/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    // Do not parse ambiguous locale-formatted strings; preserve source text.
+    return escapeHtml(text);
+  }
+  function loadWork() {
+    var button=document.getElementById('loadButton'), refresh=document.getElementById('refreshButton');
+    button.disabled=true;if(refresh)refresh.disabled=true;
+    google.script.run.withSuccessHandler(function(bootstrap) {
+      if(!bootstrap.ok||bootstrap.phase===0) {
+        checkIdentity();button.disabled=false;if(refresh)refresh.disabled=false;return;
+      }
+      google.script.run.withSuccessHandler(function(data) {
+        button.disabled=false;if(refresh)refresh.disabled=false;
+        document.getElementById('work').classList.remove('hidden');
+        document.getElementById('welcome').textContent='My Work · '+(data.user.displayName||data.user.email);
+        document.getElementById('assigned').textContent=data.cards.assignedTasks;
+        document.getElementById('completed').textContent=data.cards.completedTasks;
+        document.getElementById('sets').textContent=data.cards.distinctSets;
+        document.getElementById('projects').textContent=data.cards.assignedProjects;
+        document.getElementById('stamp').textContent=' Last refreshed: '+data.refreshedAt;
+        document.getElementById('partialWarning').classList.toggle('hidden',!data.hasPartialData);
+        document.getElementById('rows').innerHTML=data.rows.length?data.rows.map(function(row) {
+          return '<tr><td>'+escapeHtml(row.projectName)+'</td><td>'+escapeHtml(row.datasetSetId)+'</td><td>'+
+            escapeHtml(row.status)+'</td><td>'+displayDate(row.assignedDate)+'</td><td>'+displayDate(row.submittedDate)+
+            '</td><td>'+escapeHtml(row.approvedObjects||'—')+'</td><td>'+escapeHtml(row.rejectedObjects||'—')+
+            '</td><td>'+escapeHtml(row.holdNote||'—')+'</td></tr>';
+        }).join(''):'<tr><td colspan="8">No task rows found for your account.</td></tr>';
+        var errors=document.getElementById('errors');
+        errors.classList.toggle('hidden',!data.projectErrors.length);
+        errors.innerHTML=data.projectErrors.length?'<h2>Project connection issues</h2><ul class="error-list">'+
+          data.projectErrors.map(function(item){return '<li><strong>'+escapeHtml(item.projectName||item.projectId)+
+          ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
+        setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
+        if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
+        loadAttendance();
+      }).withFailureHandler(function(error) {
+        button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
+      }).getMyWork();
+    }).withFailureHandler(function(error) {
+      button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
+    }).getBootstrap();
+  }
+  function newRequestId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID().replace(/-/g,'');
+    return 'req_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14);
+  }
+  function attendanceMessage(message, kind) {
+    var el=document.getElementById('attendanceStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function loadAttendance() {
+    google.script.run.withSuccessHandler(function(data) {
+      var session=data.session;
+      var open=data.hasOpenSession;
+      var lines=['Today: '+data.today+' ('+data.timeZone+')'];
+      if(session) lines.push('Clocked in at '+session.clockInAt);
+      else if(open) lines.push('A previous-day session remains open. Contact an administrator; do not clock in again.');
+      else lines.push('No open attendance session.');
+      if(data.openBreak) lines.push('Active break: '+data.openBreak.type+' since '+data.openBreak.startAt);
+      attendanceMessage(lines.join(' · '),open&&!session?'warn':'good');
+      document.getElementById('clockInButton').disabled=open;
+      document.getElementById('clockOutButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakStartButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakEndButton').disabled=!Boolean(data.openBreak);
+      if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getMyAttendanceStatus();
+  }
+  function runAttendanceAction(action) {
+    var requestId=newRequestId();
+    var runner=google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message||'Attendance action recorded.','good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    });
+    if(action==='CLOCK_IN') runner.attendanceClockIn(requestId);
+    else if(action==='CLOCK_OUT') runner.attendanceClockOut(requestId);
+    else if(action==='BREAK_START') runner.attendanceStartBreak(requestId,document.getElementById('breakType').value);
+    else if(action==='BREAK_END') runner.attendanceEndBreak(requestId);
+  }
+  function initializeAttendance() {
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).initializeAttendanceStorage();
+  }
+  function toggleLeaveFields() {
+    var type=document.getElementById('leaveType').value;
+    document.getElementById('partialPeriodWrap').classList.toggle('hidden',type!=='half_day');
+    document.getElementById('shortStartWrap').classList.toggle('hidden',type!=='short_leave');
+    document.getElementById('shortEndWrap').classList.toggle('hidden',type!=='short_leave');
+    if(type==='short_leave') document.getElementById('leaveEndDate').value=document.getElementById('leaveStartDate').value;
+  }
+  function submitLeave() {
+    var type=document.getElementById('leaveType').value;
+    var startDate=document.getElementById('leaveStartDate').value;
+    var payload={
+      startDate:startDate,
+      endDate:type==='short_leave'?startDate:document.getElementById('leaveEndDate').value,
+      leaveType:type,
+      partialPeriod:type==='half_day'?document.getElementById('partialPeriod').value:'',
+      startTime:type==='short_leave'?document.getElementById('shortStartTime').value:'',
+      endTime:type==='short_leave'?document.getElementById('shortEndTime').value:'',
+      reason:document.getElementById('leaveReason').value
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceSubmitLeaveRequest(payload,newRequestId());
+  }
+  function loadLeaveRequests() {
+    google.script.run.withSuccessHandler(function(result) {
+      var isAdmin=result.role==='admin';
+      document.getElementById('leaveActionsHeader').textContent=isAdmin?'Review':'Details';
+      var body=document.getElementById('leaveRows');
+      if(!result.rows.length) {
+        body.innerHTML='<tr><td colspan="5">No leave requests found.</td></tr>';
+        return;
+      }
+      body.innerHTML=result.rows.map(function(row) {
+        var date=escapeHtml(row.startDate)+(row.endDate!==row.startDate?' – '+escapeHtml(row.endDate):'');
+        var details=escapeHtml(row.partialPeriod||'')+(row.startTime?' '+escapeHtml(row.startTime)+'–'+escapeHtml(row.endTime):'')+
+          (row.reason?' · '+escapeHtml(row.reason):'')+(isAdmin&&row.email?' · '+escapeHtml(row.email):'');
+        var actions=isAdmin&&row.status==='PENDING'
+          ? '<button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'APPROVED\')">Approve</button><button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'REJECTED\')">Reject</button>'
+          : escapeHtml(row.status);
+        return '<tr><td>'+date+'</td><td>'+escapeHtml(row.leaveType.replace('_',' '))+'</td><td>'+escapeHtml(row.status)+'</td><td>'+details+'</td><td>'+actions+'</td></tr>';
+      }).join('');
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getAttendanceLeaveRequests();
+  }
+  function reviewLeave(leaveId,decision) {
+    var note=window.prompt('Optional review note:')||'';
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceReviewLeaveRequest(leaveId,decision,note,newRequestId());
+  }
+  document.addEventListener('DOMContentLoaded',function() {
+    var today=new Date();
+    var localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    document.getElementById('leaveStartDate').value=localDate;
+    document.getElementById('leaveEndDate').value=localDate;
+    document.getElementById('leaveStartDate').addEventListener('change',function() {
+      if(document.getElementById('leaveType').value==='short_leave') document.getElementById('leaveEndDate').value=this.value;
+    });
+  });
+  checkIdentity();
+</script></body></html>
