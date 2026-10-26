@@ -242,6 +242,7 @@ function login(emailValue, accessCodeValue) {
     const now = Date.now();
     const session = {
       email: user.email,
+      credentialHash: storedHash,
       issuedAt: now,
       expiresAt: now + AUTH.SESSION_TTL_SECONDS * 1000
     };
@@ -252,9 +253,9 @@ function login(emailValue, accessCodeValue) {
       expiresAt: session.expiresAt,
       user: { email: user.email, displayName: user.displayName, role: user.role },
       dataGatePassed: isIdentityGatePassed_(),
-      message: isIdentityGatePassed_
+      message: isIdentityGatePassed_()
         ? 'Signed in. Access permissions will be checked for each request.'
-        : 'Signed in, but application data remains locked until the administrator enables the test data gate.'
+        : 'Signed in, but application data remains locked until the administrator enables the TEST data gate.'
     };
   } finally {
     lock.releaseLock();
@@ -285,6 +286,16 @@ function getAuthenticatedEmployee_(authToken) {
   if (!user) {
     cache.remove(authSessionKey_(token));
     throw new Error('Your employee access is inactive or misconfigured.');
+  }
+  const credentialTable = readTable_(authCredentialSheet_());
+  const emailIndex = findHeaderIndex_(credentialTable.headers, 'Email');
+  const hashIndex = findHeaderIndex_(credentialTable.headers, 'Access Code Hash');
+  const activeIndex = findHeaderIndex_(credentialTable.headers, 'Active');
+  const credentialRows = credentialTable.rows.filter(row => normalizeEmail_(row[emailIndex]) === user.email);
+  if (credentialRows.length !== 1 || !isActiveValue_(credentialRows[0][activeIndex]) ||
+      String(credentialRows[0][hashIndex] || '').toLowerCase() !== String(session.credentialHash || '')) {
+    cache.remove(authSessionKey_(token));
+    throw new Error('Your access code has been changed or disabled. Sign in again.');
   }
   return user;
 }
