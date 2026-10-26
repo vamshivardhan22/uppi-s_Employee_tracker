@@ -67,6 +67,29 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Stale open sessions follow the agreed auto-close policy and preserve an audit trail.
 - [ ] Labellers cannot read or modify other employees' private attendance details unless explicitly authorized by the role policy.
 
-## G. Release rule
+## G. Phase 2 — attendance and leave
+
+- [ ] Admin initialization creates exactly the five attendance/leave tabs in the private TEST master.
+- [ ] Initialization does not overwrite any existing tab with unexpected headers or data.
+- [ ] Direct attendance API calls fail when the identity gate is closed.
+- [ ] Unauthenticated, inactive, duplicate employee and non-admin review calls are denied.
+- [ ] Clock-in creates one open session with a server-generated timestamp and event.
+- [ ] Replaying the same request ID and action returns the original result without adding rows.
+- [ ] Reusing a request ID for a different action is rejected.
+- [ ] Concurrent clock-in requests create at most one open session for the employee.
+- [ ] Clock-out is rejected while a break is open.
+- [ ] A second break cannot start until the first is ended; unmatched break-end is rejected.
+- [ ] Clock-in is rejected while a prior-day session remains open; no guessed clock-out time is inserted.
+- [ ] Full-day leave accepts a valid date range; half-day leave requires one date and AM/PM; short leave requires one date and valid increasing times.
+- [ ] Leave requests cannot be submitted for past dates or overlap another pending/approved request for that employee.
+- [ ] Labellers can only read their own leave requests; admin review is role-checked and only pending requests can be reviewed.
+- [ ] Event log records clock-in/out, break start/end, leave request/review, and auto-close events.
+- [ ] `ATTENDANCE_MAX_SESSION_HOURS` missing or outside 1–24 causes stale-session closure to fail safely.
+- [ ] With an approved max-session setting, stale sessions close at the configured duration and record the actual closure time/reason separately.
+- [ ] Simulate a Sheets write failure between multi-tab updates and document recovery behavior before production.
+- [ ] Verify local date handling across midnight and daylight-saving-free `Asia/Kolkata` assumptions.
+- [ ] Confirm no attendance/leave writes touch source project task spreadsheets.
+
+## H. Release rule
 
 No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable checks pass and a reviewer verifies the exact metric definitions.
