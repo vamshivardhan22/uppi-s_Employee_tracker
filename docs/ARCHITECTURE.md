@@ -21,15 +21,16 @@ This document describes the architecture agreed for this project. Implement the 
 
 ## Trust boundaries
 
-- Browser input is untrusted. User-data APIs must not accept an email argument as the user's identity.
-- `Session.getActiveUser().getEmail()` is the intended visitor identity, but Apps Script may return blank depending on account type and deployment configuration.
-- `Session.getEffectiveUser().getEmail()` is diagnostic only, logged server-side, and never returned to the browser or used for authorization.
+- Browser input is untrusted. Email alone is not an authentication factor.
+- Personal Gmail users authenticate with unique, high-entropy employee access codes. The private master stores only the SHA-256 hash; the plaintext code is logged once by an editor-only provisioning helper and must be delivered privately.
+- Successful login creates a short-lived random session token stored server-side in Script Cache. Every data endpoint validates the token, rechecks that the employee is active, and confirms the credential hash has not changed. Cache eviction fails closed and may require sign-in again.
+- The application does not rely on `Session.getActiveUser().getEmail()` or use `Session.getEffectiveUser()` as visitor identity.
 - The script owner must have read access to every configured source spreadsheet.
 - Attendance and other app-owned writes must be authorized server-side and protected against concurrent requests.
 
 ## Phase boundaries
 
-- **Phase 0:** identity diagnostic only; no spreadsheet reads through the diagnostic endpoint. Do not open the gate until active identity has been verified for the actual deployment audience.
+- **Phase 0:** build and verify secure access-code login for personal Gmail users. Keep the application data gate closed while testing valid/invalid codes, inactive accounts, session expiry, code rotation and role boundaries. The login endpoint reads only the employee/credential records it needs; it does not read task-source data. Do not open the gate until the access-code model passes these tests.
 - **Phase 1:** authenticated, read-only My Work dashboard and summary cards.
 - **Phase 2:** attendance, full/half/short leave, login/logout and breaks. The current code uses server timestamps, a script lock, per-request idempotency records, an append-only attendance event log, overlap checks for pending/approved leave, and admin review. Full-day requests may cover a date range; half-day requests use AM/PM for one date; short leave uses a same-day time range. Stale-session closure requires the explicit `ATTENDANCE_MAX_SESSION_HOURS` property; automatic trigger installation remains in Phase 3. Validate all policy thresholds with the agreed business rules before enabling this function.
 - **Phase 3:** issue detection, turnaround-time checks, reminders/digests and scheduled scanning. Stable issue keys, chunking and quota-aware execution are required; measure execution duration before choosing scan frequency.
@@ -46,6 +47,8 @@ This document describes the architecture agreed for this project. Implement the 
 
 ## Phase 2 storage and trust boundaries
 
+- The editor-only initialization helper creates `Employee_Credentials` in the private master, storing one SHA-256 hash per active employee.
+- The editor-only provisioning helper creates/rotates a unique per-employee access code and logs it once. These helpers end in `_` so they are not exposed through `google.script.run`.
 - The admin-only initialization action creates `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests` in the private master spreadsheet. Existing tabs with mismatched headers fail closed rather than being overwritten.
 - Attendance actions do not accept an employee email from the browser. The server derives the active user and checks the employee record for each call.
 - `Attendance_Events` is append-only from application code. Session and break summary rows are updated as the current state; request records support safe replay of a previously successful request.
@@ -56,5 +59,6 @@ This document describes the architecture agreed for this project. Implement the 
 ## Operational constraints
 
 - The master spreadsheet is private and is not a replacement for project task sheets.
+- The login email is an account lookup and is not proof that the browser is logged into that exact Gmail account. Authentication depends on possession of the separately distributed high-entropy access code. Do not describe this as Google SSO.
 - Scheduled scans must be designed around measured execution time and Apps Script quotas. As a planning upper bound, a six-minute execution every 15 minutes can consume up to 576 execution-minutes in 24 hours; during an eight-hour workday that cadence is 32 runs and up to 192 execution-minutes. Actual duration and applicable account quotas must be confirmed before scheduling.
 - Never turn on production triggers or outgoing email before the applicable verification checklist has passed.
