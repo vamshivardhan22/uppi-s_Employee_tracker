@@ -70,8 +70,8 @@ function attendanceSheets_() {
   return result;
 }
 
-function initializeAttendanceStorage() {
-  const admin = requireAdmin_();
+function initializeAttendanceStorage(authToken) {
+  const admin = requireAdmin_(authToken);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error('The application is busy. Try again shortly.');
   try {
@@ -174,9 +174,8 @@ function attendanceWriteEvent_(sheets, email, sessionId, requestId, eventType, d
   });
 }
 
-function attendanceWithAction_(action, requestId, operation) {
-  if (!isIdentityGatePassed_()) throw new Error('Identity gate is closed. Attendance actions are disabled.');
-  const user = requireActiveEmployee_();
+function attendanceWithAction_(authToken, action, requestId, operation) {
+  const user = requireActiveEmployee_(authToken);
   const key = attendanceRequireRequestId_(requestId);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) throw new Error('The application is busy. Try again shortly; your action has not been processed.');
@@ -241,15 +240,14 @@ function attendanceStatusForUser_(user, sheets) {
   };
 }
 
-function getMyAttendanceStatus() {
-  if (!isIdentityGatePassed_()) throw new Error('Identity gate is closed. Attendance data is unavailable.');
-  const user = requireActiveEmployee_();
+function getMyAttendanceStatus(authToken) {
+  const user = requireActiveEmployee_(authToken);
   const sheets = attendanceSheets_();
   return attendanceStatusForUser_(user, sheets);
 }
 
-function attendanceClockIn(requestId) {
-  return attendanceWithAction_('CLOCK_IN', requestId, function(user, sheets, key, now) {
+function attendanceClockIn(authToken, requestId) {
+  return attendanceWithAction_(authToken, 'CLOCK_IN', requestId, function(user, sheets, key, now) {
     const today = attendanceDateKey_(now);
     const existing = attendanceCurrentSession_(sheets, user.email);
     if (existing) {
@@ -270,8 +268,8 @@ function attendanceClockIn(requestId) {
   });
 }
 
-function attendanceClockOut(requestId) {
-  return attendanceWithAction_('CLOCK_OUT', requestId, function(user, sheets, key, now) {
+function attendanceClockOut(authToken, requestId) {
+  return attendanceWithAction_(authToken, 'CLOCK_OUT', requestId, function(user, sheets, key, now) {
     const session = attendanceCurrentSession_(sheets, user.email);
     if (!session) throw new Error('You are not clocked in.');
     if (attendanceOpenBreak_(sheets, session['Session ID'])) {
@@ -285,8 +283,8 @@ function attendanceClockOut(requestId) {
   });
 }
 
-function attendanceStartBreak(requestId, breakType) {
-  return attendanceWithAction_('BREAK_START', requestId, function(user, sheets, key, now) {
+function attendanceStartBreak(authToken, requestId, breakType) {
+  return attendanceWithAction_(authToken, 'BREAK_START', requestId, function(user, sheets, key, now) {
     const allowed = ['tea', 'lunch', 'personal', 'other'];
     const type = String(breakType == null ? '' : breakType).trim().toLowerCase();
     if (!allowed.includes(type)) throw new Error('Choose a valid break type.');
@@ -304,8 +302,8 @@ function attendanceStartBreak(requestId, breakType) {
   });
 }
 
-function attendanceEndBreak(requestId) {
-  return attendanceWithAction_('BREAK_END', requestId, function(user, sheets, key, now) {
+function attendanceEndBreak(authToken, requestId) {
+  return attendanceWithAction_(authToken, 'BREAK_END', requestId, function(user, sheets, key, now) {
     const session = attendanceCurrentSession_(sheets, user.email);
     if (!session) throw new Error('You do not have an open attendance session.');
     const openBreak = attendanceOpenBreak_(sheets, session['Session ID']);
@@ -332,9 +330,9 @@ function attendanceValidateTime_(value, fieldName) {
   return text;
 }
 
-function attendanceSubmitLeaveRequest(payload, requestId) {
+function attendanceSubmitLeaveRequest(authToken, payload, requestId) {
   const data = payload && typeof payload === 'object' ? payload : {};
-  return attendanceWithAction_('LEAVE_REQUEST', requestId, function(user, sheets, key, now) {
+  return attendanceWithAction_(authToken, 'LEAVE_REQUEST', requestId, function(user, sheets, key, now) {
     const start = attendanceValidateDate_(data.startDate, 'Start date');
     const end = attendanceValidateDate_(data.endDate, 'End date');
     if (end < start) throw new Error('End date cannot be before start date.');
@@ -379,9 +377,8 @@ function attendanceSubmitLeaveRequest(payload, requestId) {
   });
 }
 
-function getAttendanceLeaveRequests() {
-  if (!isIdentityGatePassed_()) throw new Error('Identity gate is closed. Attendance data is unavailable.');
-  const user = requireActiveEmployee_();
+function getAttendanceLeaveRequests(authToken) {
+  const user = requireActiveEmployee_(authToken);
   const sheets = attendanceSheets_();
   const rows = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]);
   const visible = user.role === 'admin' ? rows : rows.filter(row => row.Email === user.email);
@@ -399,8 +396,8 @@ function getAttendanceLeaveRequests() {
   };
 }
 
-function attendanceReviewLeaveRequest(leaveId, decision, reviewNote, requestId) {
-  return attendanceWithAction_('LEAVE_REVIEW', requestId, function(user, sheets, key, now) {
+function attendanceReviewLeaveRequest(authToken, leaveId, decision, reviewNote, requestId) {
+  return attendanceWithAction_(authToken, 'LEAVE_REVIEW', requestId, function(user, sheets, key, now) {
     if (user.role !== 'admin') throw new Error('Administrator access is required to review leave.');
     const id = String(leaveId == null ? '' : leaveId).trim();
     const action = String(decision == null ? '' : decision).trim().toUpperCase();
@@ -424,8 +421,8 @@ function attendanceReviewLeaveRequest(leaveId, decision, reviewNote, requestId) 
  * Set ATTENDANCE_MAX_SESSION_HOURS only after the business rule is approved.
  * This function records both the closure and reason in the session row and event log.
  */
-function closeStaleAttendanceSessions() {
-  requireAdmin_();
+function closeStaleAttendanceSessions_() {
+  if (!isIdentityGatePassed_()) throw new Error('Application data is locked. Enable the data gate before running maintenance.');
   const configured = PropertiesService.getScriptProperties().getProperty('ATTENDANCE_MAX_SESSION_HOURS');
   const maxHours = Number(configured);
   if (!configured || !isFinite(maxHours) || maxHours < 1 || maxHours > 24) {
