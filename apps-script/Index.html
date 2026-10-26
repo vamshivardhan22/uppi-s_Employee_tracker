@@ -140,6 +140,7 @@
           data.projectErrors.map(function(item){return '<li><strong>'+escapeHtml(item.projectName||item.projectId)+
           ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
         setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
+        if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
         loadAttendance();
       }).withFailureHandler(function(error) {
         button.disabled=false;if(refresh)refresh.disabled=false;setStatus(error.message||String(error),'bad');
