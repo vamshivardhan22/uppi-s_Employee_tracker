@@ -1,6 +1,6 @@
-# Phase 0/1 Verification Plan
+# Verification Plan
 
-Use only synthetic data in a dedicated TEST master spreadsheet and fake source project sheet.
+Use only synthetic data in a dedicated TEST master spreadsheet and fake source project sheet. This checklist is the project's verification path; do not substitute unrelated project examples.
 
 ## A. Configuration
 
@@ -15,7 +15,7 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Duplicate/missing headers produce a visible error.
 - [ ] Configured source spreadsheet IDs and tab names are correct; script owner can read each source.
 
-## B. Identity gate — mandatory before any task data
+## B. Identity gate — mandatory before task data
 
 - [ ] Deploy the TEST web app for the intended audience and open its `/exec` URL as a test admin.
 - [ ] Record active-user email, timestamp and deployment audience. The effective-user identity is logged server-side in Apps Script execution logs and is not exposed in the public diagnostic response.
@@ -56,6 +56,17 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Record execution duration and quota consumption for expected row counts.
 - [ ] Confirm source spreadsheets are not modified.
 
-## Release rule
+## F. Phase 2 — attendance and breaks (before implementation is considered complete)
+
+- [ ] Only an authenticated active employee can write attendance actions.
+- [ ] Attendance events use server-generated timestamps in `Asia/Kolkata`.
+- [ ] Concurrent duplicate clock-in/out requests do not create inconsistent sessions.
+- [ ] Break start/end rules prevent overlapping or unmatched breaks.
+- [ ] A retry of the same action does not double-write events.
+- [ ] Full-day, half-day and short leave rules follow the agreed definitions.
+- [ ] Stale open sessions follow the agreed auto-close policy and preserve an audit trail.
+- [ ] Labellers cannot read or modify other employees' private attendance details unless explicitly authorized by the role policy.
+
+## G. Release rule
 
 No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable checks pass and a reviewer verifies the exact metric definitions.
