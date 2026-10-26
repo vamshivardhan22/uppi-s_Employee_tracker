@@ -1,24 +1,31 @@
 # Labeller Dashboard
 
-A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed design keeps existing project spreadsheets as the task source of truth and uses a separate, private master spreadsheet for access configuration and app-owned records.
+A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed design keeps existing project spreadsheets as the task source of truth and uses a separate, private master spreadsheet for employee/project access configuration and app-owned records.
 
 ## Build status
 
 The repository currently contains the Phase 0/1 starter implementation. It is **not a completed or production-verified application**.
 
-- **Phase 0:** identity diagnostic only; do not expose task data until identity is confirmed for the actual deployment audience.
-- **Phase 1:** read-only My Work view and basic summary cards after the identity gate is explicitly enabled.
-- **Next phases:** attendance and breaks; issue detection and reminders; admin/team dashboard and charts; reliability testing and controlled pilot.
+- **Phase 0:** verify the deployed app's active-user identity without reading spreadsheet data.
+- **Phase 1:** deliver the authenticated, read-only My Work dashboard.
+- **Phase 2:** attendance, leave, login/logout and break tracking.
+- **Phase 3:** issue scanning, turnaround-time checks, reminders and quota-aware scheduled processing.
+- **Phase 4:** admin People/Projects management, team dashboard, reports, charts and snapshots.
+- **Phase 5:** privacy, concurrency, edge-case, load, quota, backup and restore verification.
+- **Phase 6:** separate TEST and PROD setup, staged pilot, and controlled release.
+
+Implementation must follow this sequence. Do not add unrelated systems, external project templates, or features outside the agreed scope.
 
 ## Locked design
 
-- Task data remains in existing Google Sheets. The dashboard does not create a second task database or edit task rows.
-- A separate private master spreadsheet stores employee access, project configuration and column mappings.
+- Existing project spreadsheets remain the task source of truth. The dashboard does not create a second task database or edit task rows.
+- A separate private master spreadsheet stores employee access, project configuration and app-owned records.
 - Server-side authorization derives identity from `Session.getActiveUser().getEmail()`. Browser-supplied email is never accepted as an authorization parameter.
 - Project access is checked server-side before project sheets are read.
 - Timezone: `Asia/Kolkata`.
 - Target: no additional software-license cost, subject to actual Google account type and service quotas.
-- Use synthetic data only during TEST.
+- Use synthetic data only in TEST.
+- Build the application from the agreed requirements and architecture; do not base it on or import code, design or decisions from unrelated repositories.
 
 ## Repository layout
 
