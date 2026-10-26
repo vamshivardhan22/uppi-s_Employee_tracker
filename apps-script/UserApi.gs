@@ -1,11 +1,7 @@
-function getMyWork() {
-  // Authorization derives identity server-side; this function accepts no email parameter.
-  // Check the gate before opening the master spreadsheet or reading any task source.
-  if (!isIdentityGatePassed_()) {
-    throw new Error('Identity gate is closed. Task data endpoints are disabled.');
-  }
-
-  const user = requireActiveEmployee_();
+function getMyWork(authToken) {
+  // This token is issued only after the server validates the per-employee access code.
+  // The data gate is checked before master/task source sheets are read.
+  const user = requireActiveEmployee_(authToken);
   const projects = getAssignedProjects_(user.email);
   const payload = buildMyWorkPayload_(user.email, projects);
 
