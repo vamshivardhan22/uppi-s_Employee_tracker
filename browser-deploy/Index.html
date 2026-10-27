@@ -285,8 +285,8 @@
         var label=item.datasetSetId?item.datasetSetId:('Row '+item.sourceRow);
         return '<tr><td>'+escapeHtml(item.severity)+'</td><td>'+escapeHtml(item.projectName)+'</td><td>'+
           escapeHtml(label)+'</td><td>'+escapeHtml(item.issueType)+'</td><td>'+escapeHtml(item.assignedTo)+'</td><td>'+
-          escapeHtml(item.details)+'</td><td>'+escapeHtml(item.lastSeenAt)+'</td><td><button onclick="resolveIssuePrompt(\\''+
-          escapeHtml(item.issueKey)+'\\')">Resolve</button></td></tr>';
+          escapeHtml(item.details)+'</td><td>'+escapeHtml(item.lastSeenAt)+'</td><td><button onclick="resolveIssuePrompt(&#39;'+
+          escapeHtml(item.issueKey)+'&#39;)">Resolve</button></td></tr>';
       }).join(''):'<tr><td colspan="8">No open issues found in the current scan.</td></tr>';
       if(!result.scheduleEnabled) document.getElementById('issueIntervalHours').disabled=false;
     }).withFailureHandler(function(error) {
