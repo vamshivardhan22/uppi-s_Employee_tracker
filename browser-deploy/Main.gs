@@ -639,7 +639,7 @@ function attendanceDateValueKey_(value) {
   }
   const text = String(value == null ? '' : value).trim();
   if (!text) return '';
-  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     const parsedIso = new Date(text + 'T00:00:00Z');
     return !isNaN(parsedIso.getTime()) && parsedIso.toISOString().slice(0, 10) === text ? text : '';
   }
