@@ -86,7 +86,9 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] A second break cannot start until the first is ended; unmatched break-end is rejected.
 - [ ] Clock-in is rejected while a prior-day session remains open; no guessed clock-out time is inserted.
 - [ ] Full-day leave accepts a valid date range; half-day leave requires one date and AM/PM; short leave requires one date and valid increasing times.
-- [ ] Leave requests cannot be submitted for past dates or overlap another pending/approved request for that employee.
+- [ ] Leave requests cannot be submitted for past dates or overlap another pending/approved request for that employee, even when Google Sheets returns date cells as `Date` objects rather than ISO strings.
+- [ ] Regression test: after one same-day leave request is pending/approved, a second overlapping request is rejected and does not append a new row.
+- [ ] Leave request dates returned to the UI are normalized to `YYYY-MM-DD` and do not render as long JavaScript date strings.
 - [ ] Labellers can only read their own leave requests; admin review is role-checked and only pending requests can be reviewed.
 - [ ] Event log records clock-in/out, break start/end, leave request/review, and auto-close events.
 - [ ] `ATTENDANCE_MAX_SESSION_HOURS` missing or outside 1–24 causes stale-session closure to fail safely.
