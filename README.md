@@ -4,12 +4,12 @@ A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed d
 
 ## Build status
 
-The repository contains Phase 0/1 and Phase 2 implementation with selected live TEST checks completed. It is **not a completed or production-verified application**.
+The repository contains Phase 0/1 and Phase 2 implementation with selected live TEST checks completed, plus Phase 3 issue/TAT scanning code in the development branch. Phase 3 has passed parser and in-memory smoke checks but is **not yet verified in the live TEST deployment**. The application is not production-verified.
 
 - **Phase 0:** access-code sign-in, invalid-code rejection, sign-out and session revocation verified in TEST; remaining identity/role edge cases still need checks.
 - **Phase 1:** read-only My Work dashboard verified with synthetic data; the Labeller sees only their assigned rows.
 - **Phase 2:** clock-in/out, break start/end, full-day leave submission, admin approval, labeller leave visibility, short-leave validation and overlap protection verified in TEST; edge-case and reliability checks remain.
-- **Phase 3:** issue scanning, turnaround-time checks, reminders and quota-aware scheduled processing.
+- **Phase 3:** admin-only issue scanning, configurable TAT rules, issue registry, scan-run metrics, digest preview, quota-aware email digest, and opt-in scheduled scans are implemented in source. Live TEST setup and verification remain.
 - **Phase 4:** admin People/Projects management, team dashboard, reports, charts and snapshots.
 - **Phase 5:** privacy, concurrency, edge-case, load, quota, backup and restore verification.
 - **Phase 6:** separate TEST and PROD setup, staged pilot, and controlled release.
@@ -40,6 +40,7 @@ apps-script/
   Metrics.gs
   UserApi.gs
   Attendance.gs
+  IssueScanner.gs
   Index.html
 browser-deploy/
   Main.gs
@@ -93,7 +94,7 @@ The canonical names are mapping keys; each `Sheet Header` value must match the h
 
 The Phase 2 module stores attendance in the private master spreadsheet, not in the project task sheets. The admin initialization action creates `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests`. Event records are append-only; request IDs make repeated identical calls return the original result. The server uses a script lock around each action.
 
-Leave types supported by the current implementation are full day, half day (AM/PM), and short leave (single date with a start/end time). Requests begin as `PENDING`; admins can approve or reject them. The automatic stale-session closure function requires an explicitly approved `ATTENDANCE_MAX_SESSION_HOURS` Script Property (1–24 hours); no scheduled trigger is enabled yet. Phase 3 owns scheduled scanning/trigger setup.
+Leave types supported by the current implementation are full day, half day (AM/PM), and short leave (single date with a start/end time). Requests begin as `PENDING`; admins can approve or reject them. The automatic stale-session closure function requires an explicitly approved `ATTENDANCE_MAX_SESSION_HOURS` Script Property (1–24 hours); its trigger remains uninstalled. Phase 3 code includes a separate opt-in issue-scan trigger, also disabled by default.
 
 ## Security and release rules
 
