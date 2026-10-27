@@ -45,7 +45,12 @@ function isIdentityGatePassed_() {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty(APP.IDENTITY_GATE_PROPERTY) !== 'true') return false;
   const env = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
+  const currentMasterId = String(props.getProperty(APP.MASTER_ID_PROPERTY) || '').trim();
+  const expectedMasterProperty = env === 'TEST' ? 'TEST_MASTER_SPREADSHEET_ID'
+    : (env === 'PROD' ? 'PROD_MASTER_SPREADSHEET_ID' : '');
+  if (!expectedMasterProperty) return false;
+  const expectedMasterId = String(props.getProperty(expectedMasterProperty) || '').trim();
+  if (!currentMasterId || !expectedMasterId || currentMasterId !== expectedMasterId) return false;
   if (env === 'TEST') return true;
-  if (env === 'PROD' && props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true') return true;
-  return false;
+  return env === 'PROD' && props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true';
 }
