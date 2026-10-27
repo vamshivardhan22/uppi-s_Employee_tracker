@@ -628,6 +628,18 @@ const ISSUE_SCAN = Object.freeze({
   MAX_BUDGET_MS: 240000
 });
 
+function issueAutomationReleaseGuard_() {
+  const props = PropertiesService.getScriptProperties();
+  const env = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
+  if (!['TEST', 'PROD'].includes(env)) {
+    throw new Error('Set APP_ENV_LABEL explicitly to TEST or PROD before running scans, reminders or triggers.');
+  }
+  if (env === 'PROD' && props.getProperty('PRODUCTION_RELEASE_APPROVED') !== 'true') {
+    throw new Error('Production automation is blocked until PRODUCTION_RELEASE_APPROVED=true after the release checklist is signed off.');
+  }
+  return env;
+}
+
 function issueNow_() {
   return new Date();
 }
@@ -1169,6 +1181,7 @@ function issuePersistScan_(context, startedAt, scanId, elapsedMs, cursor) {
 }
 
 function issueRunScanInternal_() {
+  issueAutomationReleaseGuard_();
   if (!isIdentityGatePassed_()) throw new Error('Application data is locked. The TEST data gate must be enabled to scan synthetic projects.');
   const sheets = issueGetSheets_();
   const leaseId = issueAcquireRunLease_();
@@ -1523,6 +1536,8 @@ function issueSendDigestInternal_() {
   if (props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) !== 'true') {
     return { ok: false, sent: 0, skipped: 0, message: 'Email reminders are disabled. No email was sent.' };
   }
+  issueAutomationReleaseGuard_();
+  if (!isIdentityGatePassed_()) throw new Error('Application data gate is closed; no email was sent.');
   const groups = issueDigestGroups_();
   if (!groups.length) return { ok: true, sent: 0, skipped: 0, message: 'No open issues need a reminder.' };
   const remainingQuota = MailApp.getRemainingDailyQuota();
@@ -1586,6 +1601,7 @@ function sendIssueDigest(authToken) {
 
 function installIssueScanTrigger(authToken, intervalHours) {
   requireAdmin_(authToken);
+  issueAutomationReleaseGuard_();
   if (!isIdentityGatePassed_()) throw new Error('Enable the TEST data gate before installing a scan schedule.');
   issueGetSheets_();
   const hours = Number(intervalHours);
@@ -1616,6 +1632,7 @@ function disableIssueScanTrigger(authToken) {
 function scheduledIssueScan_() {
   const props = PropertiesService.getScriptProperties();
   if (props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) !== 'true' || !isIdentityGatePassed_()) return;
+  try { issueAutomationReleaseGuard_(); } catch (guardError) { Logger.log('Scheduled issue scan blocked: %s', String(guardError && guardError.message ? guardError.message : guardError)); return; }
   try {
     const result = issueRunScanInternal_();
     Logger.log('Scheduled issue scan finished: %s', JSON.stringify(result));
