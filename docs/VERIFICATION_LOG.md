@@ -88,3 +88,12 @@ The browser bundle and inline JavaScript were also parsed successfully after the
 ## Release decision
 
 **Do not merge or deploy to production yet.** The source and mocked checks pass, but Phase 0–2 are not live-runtime verified. Keep the TEST data gate closed until the browser-based authentication checks pass. Do not use real employee data until the TEST configuration and privacy checks are complete.
+
+
+## Live TEST regression discovered on 2026-10-27
+
+During browser-based Phase 2 testing, submitting another leave request for the same date as an already approved request created a new PENDING row. This is a failed live test, despite the earlier in-memory mock check. The row date was being read from Google Sheets as a JavaScript `Date` object, while the overlap logic accepted only string dates; the same assumption also caused long date strings in the UI.
+
+A fix has been applied to normalize sheet date values to `YYYY-MM-DD` before checking overlapping requests, computing today's leave status, or returning leave dates to the UI. Invalid dates in existing pending/approved requests now fail closed rather than being skipped. The labeller's redundant final status cell is also simplified.
+
+**Re-test required:** copy the updated browser bundle into the TEST Apps Script project, deploy a new version, and verify that a same-date duplicate request is rejected without adding a row. The duplicate PENDING row already created during the test must be resolved by an Admin through the app (reject it with a note such as `Duplicate created during regression test`); do not delete audit rows manually. Production remains blocked until this browser-based regression is confirmed fixed.
