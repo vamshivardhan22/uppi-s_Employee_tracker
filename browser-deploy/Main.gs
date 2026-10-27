@@ -768,7 +768,7 @@ function issueReadTATRules_() {
         message: 'TAT_Rules row ' + (offset + 2) +
           ' needs Project ID, Status, Start Canonical Field, Warning Hours > 0, and Critical Hours >= Warning Hours.'
       });
-      continue;
+      return;
     }
     const key = projectId + '|' + status;
     if (rules.has(key)) {
