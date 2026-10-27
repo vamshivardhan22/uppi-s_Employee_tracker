@@ -4,17 +4,21 @@ A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed d
 
 ## Build status
 
-The repository contains Phase 0/1 and Phase 2 implementation with selected live TEST checks completed, plus Phase 3 issue/TAT scanning code in the development branch. Phase 3 has passed parser and in-memory smoke checks but is **not yet verified in the live TEST deployment**. The application is not production-verified.
+The development branch contains source implementation for all agreed phase areas (Phases 0–6). The draft pull request remains unmerged. The source build is **TEST-gated and not production-approved**.
 
-- **Phase 0:** access-code sign-in, invalid-code rejection, sign-out and session revocation verified in TEST; remaining identity/role edge cases still need checks.
-- **Phase 1:** read-only My Work dashboard verified with synthetic data; the Labeller sees only their assigned rows.
-- **Phase 2:** clock-in/out, break start/end, full-day leave submission, admin approval, labeller leave visibility, short-leave validation and overlap protection verified in TEST; edge-case and reliability checks remain.
-- **Phase 3:** admin-only issue scanning, configurable TAT rules, issue registry, scan-run metrics, digest preview, quota-aware email digest, and opt-in scheduled scans are implemented in source. Live TEST setup and verification remain.
-- **Phase 4:** admin People/Projects management, team dashboard, reports, charts and snapshots.
-- **Phase 5:** privacy, concurrency, edge-case, load, quota, backup and restore verification.
-- **Phase 6:** separate TEST and PROD setup, staged pilot, and controlled release.
+| Phase | Source implementation | Verification status |
+|---|---|---|
+| 0 — Authentication gate | Access-code authentication for personal Gmail users, credential hashes, short-lived sessions, sign-out and rotation invalidation. | Selected live TEST checks passed; identity edge cases and full role-denial tests remain. |
+| 1 — My Work | Read-only task view, assigned-row filtering, summary cards and partial-source error reporting. | Live synthetic-data isolation check passed; large-data/load checks remain. |
+| 2 — Attendance and leave | Clock-in/out, breaks, leave submission/review, request replay handling and event logging. | Selected live TEST flows passed, including the overlap regression fix; edge cases and concurrency/recovery checks remain. |
+| 3 — Issue/TAT monitoring | Read-only issue scans, configurable TAT rules, issue registry, scan logs, digest preview, guarded email and optional scheduled scanning. | Parser and in-memory smoke checks passed; updated bundle has not yet been verified live in Apps Script TEST. |
+| 4 — Admin, reports and snapshots | People/projects/access/mapping management, team report filters, charts, snapshots and admin audit log. | Source and UI are present; live role, write, reporting and snapshot checks remain. |
+| 5 — Operational readiness | Health overview, configuration audit, TEST backup creation/verification and release checklist. | Source tooling is present; real quota, failure-recovery, concurrency, backup privacy and restore-drill checks remain. |
+| 6 — Controlled rollout | Environment-to-master binding, production-approval gate, browser-only runbook and staged rollout checklist. | Release controls are present in source; no separate production project or pilot has been approved or deployed. |
 
-Implementation must follow this sequence. Do not add unrelated systems, external project templates, or features outside the agreed scope.
+Do not interpret source presence, parser checks, or mocks as proof that a deployed Apps Script behaves correctly. Continue with synthetic data only until the live TEST checklists pass. Email reminders, scheduled triggers, production access and merge remain gated.
+
+See docs/VERIFICATION_LOG.md for the distinction between live TEST observations and in-memory/static checks, and docs/TEST_PLAN.md for Phase 0–6 acceptance gates.
 
 ## Locked design
 
