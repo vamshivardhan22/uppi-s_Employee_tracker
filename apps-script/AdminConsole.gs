@@ -740,29 +740,43 @@ function getReleaseReadiness(authToken) {
   const configuredEnv = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
   const env = configuredEnv || 'UNSET';
   const masterId = getMasterSpreadsheetId_();
+  const expectedMasterProperty = env === 'TEST' ? 'TEST_MASTER_SPREADSHEET_ID'
+    : (env === 'PROD' ? 'PROD_MASTER_SPREADSHEET_ID' : '');
+  const expectedMasterId = expectedMasterProperty
+    ? String(props.getProperty(expectedMasterProperty) || '').trim() : '';
+  const currentMasterMatchesExpected = Boolean(masterId && expectedMasterId && masterId === expectedMasterId);
   const productionId = String(props.getProperty('PROD_MASTER_SPREADSHEET_ID') || '').trim();
   const gate = isIdentityGatePassed_();
+  const emailEnabled = props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true';
+  const scheduleEnabled = props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true';
+  const productionApproved = props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true';
   const issues = [];
   if (!['TEST', 'PROD'].includes(env)) issues.push('APP_ENV_LABEL must be TEST or PROD.');
   if (env !== 'TEST') issues.push('Current project is not explicitly labeled TEST. Stop until environment is reviewed.');
-  if (!gate) issues.push('IDENTITY_GATE_PASSED is false; app data is locked.');
-  if (productionId && productionId === masterId) issues.push('TEST master ID equals PROD_MASTER_SPREADSHEET_ID; environment separation failed.');
-  if (props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true') issues.push('Issue email reminders are enabled; verify consent, recipient behavior and quota before release.');
-  if (props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true') issues.push('Scheduled issue scanning is enabled in this project.');
+  if (!expectedMasterId || !currentMasterMatchesExpected) issues.push('MASTER_SPREADSHEET_ID must match the environment-specific expected master ID property.');
+  if (!gate) issues.push('Data gate is locked because the gate, environment label, expected master ID or production approval is missing/mismatched.');
+  if (env === 'TEST' && productionId) issues.push('Do not store PROD_MASTER_SPREADSHEET_ID inside the TEST project. Configure production in a separate Apps Script project.');
+  if (env === 'PROD' && !productionApproved) issues.push('Production release approval is not enabled.');
+  if (emailEnabled) issues.push('Issue email reminders are enabled; verify consent, recipient behavior and quota before release.');
+  if (scheduleEnabled) issues.push('Scheduled issue scanning is enabled in this project.');
   return {
     ok: true,
     environment: env || 'UNSET',
     currentMasterConfigured: Boolean(masterId),
+    currentMasterMatchesExpected: currentMasterMatchesExpected,
+    expectedMasterProperty: expectedMasterProperty,
     dataGatePassed: gate,
-    emailEnabled: props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true',
-    scheduleEnabled: props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true',
+    emailEnabled: emailEnabled,
+    scheduleEnabled: scheduleEnabled,
     productionMasterConfigured: Boolean(productionId),
+    productionApproved: productionApproved,
     checks: [
       { key: 'environment', passed: env === 'TEST', label: 'Explicitly labeled TEST' },
       { key: 'gate', passed: gate, label: 'TEST data gate enabled' },
-      { key: 'master_separation', passed: !productionId || productionId !== masterId, label: 'TEST and PROD master IDs differ' },
-      { key: 'email_off', passed: props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) !== 'true', label: 'Email reminders off by default' },
-      { key: 'schedule_off', passed: props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) !== 'true', label: 'Scheduled scans off by default' }
+      { key: 'master_binding', passed: currentMasterMatchesExpected, label: 'Current master matches environment-specific master ID' },
+      { key: 'prod_property', passed: env !== 'TEST' || !productionId, label: 'PROD master is not configured inside TEST project' },
+      { key: 'email_off', passed: !emailEnabled, label: 'Email reminders off by default' },
+      { key: 'schedule_off', passed: !scheduleEnabled, label: 'Scheduled scans off by default' }
     ],
     warnings: issues,
     message: 'This is a configuration readiness view, not approval to deploy to production. A human release review is still required.'
