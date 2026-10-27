@@ -141,6 +141,18 @@ function adminAccessObjects_() {
   })).filter(row => row.email && row.projectId);
 }
 
+function adminMappingObjects_() {
+  const master = getMasterSpreadsheet_();
+  const data = adminReadRows_(master.getSheetByName(APP.SHEETS.COLUMN_MAP),
+    ['Project ID', 'Canonical Field', 'Sheet Header', 'Required']);
+  return data.rows.map(row => ({
+    projectId: String(row[data.headerMap['Project ID']] || '').trim(),
+    canonicalField: String(row[data.headerMap['Canonical Field']] || '').trim(),
+    sheetHeader: String(row[data.headerMap['Sheet Header']] || '').trim(),
+    required: adminBoolean_(row[data.headerMap.Required])
+  })).filter(row => row.projectId && row.canonicalField);
+}
+
 function getAdminConsoleData(authToken) {
   const user = requireAdmin_(authToken);
   const master = getMasterSpreadsheet_();
@@ -156,7 +168,8 @@ function getAdminConsoleData(authToken) {
     missingStorage: missingStorage,
     employees: employees,
     projects: projects,
-    access: access
+    access: access,
+    mappings: adminMappingObjects_()
   };
 }
 
@@ -673,7 +686,8 @@ function listTeamSnapshots(authToken) {
 function getReleaseReadiness(authToken) {
   const actor = requireAdmin_(authToken);
   const props = PropertiesService.getScriptProperties();
-  const env = String(props.getProperty('APP_ENV_LABEL') || 'TEST').trim().toUpperCase();
+  const configuredEnv = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
+  const env = configuredEnv || 'UNSET';
   const masterId = getMasterSpreadsheetId_();
   const productionId = String(props.getProperty('PROD_MASTER_SPREADSHEET_ID') || '').trim();
   const gate = isIdentityGatePassed_();
