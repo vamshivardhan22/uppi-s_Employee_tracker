@@ -4,7 +4,7 @@ This guide is for the current branch's Apps Script build. It requires only a bro
 
 ## Files to copy
 
-Use the files under `browser-deploy/` for the initial browser-only install:
+Use the files under `browser-deploy/` for the browser-only install and for updates to an existing TEST project:
 
 - `Main.gs` — combined from the current modular Apps Script files in `apps-script/`.
 - `Index.html` — the current dashboard UI.
@@ -76,6 +76,21 @@ The app uses app-level access-code authentication for personal Gmail users. The 
 Share only the visible error text or a screenshot of the test result. Never send passwords, OAuth codes, session cookies, or private employee data.
 
 Use `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md` as the phase checklist. Browser-editor syntax checks and mock tests are useful, but only running the deployed test web app can verify Google account identity, permissions, and real Sheets behavior.
+
+## 6. Update TEST for Phase 3
+
+Phase 3 is implemented on the development branch, but it is not considered live-tested until copied to Apps Script and deployed as a new version.
+
+1. Open the current development copies: [browser-deploy/Main.gs](https://github.com/vamshivardhan22/uppi-s_Employee_tracker/blob/build/phase-0-1-dashboard/browser-deploy/Main.gs) and [browser-deploy/Index.html](https://github.com/vamshivardhan22/uppi-s_Employee_tracker/blob/build/phase-0-1-dashboard/browser-deploy/Index.html).
+2. Copy each complete file into the matching file in the existing `Labeller Dashboard TEST` project. Save both files.
+3. Use **Deploy → Manage deployments → Edit** on the existing web app deployment; choose **New version** and deploy. Keep execution as owner and the audience restricted to signed-in Google accounts. Do not create a public/anonymous deployment.
+4. Sign in as Admin using the private access code. The **Issue detection & turnaround time · Admin** panel should be visible only to Admin.
+5. Click **Initialize issue/TAT storage** once. It creates `Issue_Registry`, `Issue_Scan_Runs`, `TAT_Rules`, and `Issue_Reminder_Log` in the private master spreadsheet.
+6. Click **Run issue/TAT scan** using only the synthetic task source. Inspect the dashboard summary and `Issue_Scan_Runs`. A task assigned to an email not present in the active `Employees` list should be reported as `ANNOTATOR_NOT_ACTIVE`; the scan must not modify the source `Tasks` tab.
+7. TAT warnings/breaches require an explicit row in `TAT_Rules`. For a synthetic test, choose and record test-only thresholds; do not treat them as the real business SLA.
+8. **Do not enable `ISSUE_EMAILS_ENABLED` or install a schedule yet.** Preview the digest first. Manual scans never send email. Scheduled scans remain off unless an Admin explicitly installs a 6- or 12-hour trigger after a complete manual scan and all live checks are accepted.
+
+Use synthetic data only. If a scan is partial, has project errors, or produces unexpected findings, keep email/scheduling off and record the visible message for troubleshooting.
 
 ## Official Google instructions
 
