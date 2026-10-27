@@ -45,6 +45,8 @@ apps-script/
   UserApi.gs
   Attendance.gs
   IssueScanner.gs
+  AdminConsole.gs
+  OperationsHealth.gs
   Index.html
 browser-deploy/
   Main.gs
@@ -64,8 +66,11 @@ docs/
 2. Copy each file under `apps-script/` into its matching Apps Script file. Create an HTML file named `Index` and paste `Index.html`. Copy `appsscript.json` into the Apps Script manifest.
 3. Set the Apps Script project timezone to `Asia/Kolkata`.
 4. In Script Properties, set:
+   - `APP_ENV_LABEL`: `TEST`.
    - `MASTER_SPREADSHEET_ID`: the private TEST master spreadsheet ID.
-   - `IDENTITY_GATE_PASSED`: `false`.
+   - `TEST_MASTER_SPREADSHEET_ID`: the same ID as `MASTER_SPREADSHEET_ID`.
+   - `IDENTITY_GATE_PASSED`: `false` during authentication tests.
+   - Keep `PROD_MASTER_SPREADSHEET_ID` unset in TEST; keep issue email, scheduled triggers and TEST backup flags off unless an explicit test is approved.
 5. Create master tabs with these exact headers:
    - `Employees`: `Email`, `Display Name`, `Role`, `Active`
    - `Projects`: `Project ID`, `Project Name`, `Spreadsheet ID`, `Tab Name`, `Timezone`, `Active`
@@ -99,6 +104,14 @@ The canonical names are mapping keys; each `Sheet Header` value must match the h
 The Phase 2 module stores attendance in the private master spreadsheet, not in the project task sheets. The admin initialization action creates `Attendance_Sessions`, `Attendance_Events`, `Attendance_Breaks`, `Leave_Requests`, and `Attendance_Requests`. Event records are append-only; request IDs make repeated identical calls return the original result. The server uses a script lock around each action.
 
 Leave types supported by the current implementation are full day, half day (AM/PM), and short leave (single date with a start/end time). Requests begin as `PENDING`; admins can approve or reject them. The automatic stale-session closure function requires an explicitly approved `ATTENDANCE_MAX_SESSION_HOURS` Script Property (1–24 hours); its trigger remains uninstalled. Phase 3 code includes a separate opt-in issue-scan trigger, also disabled by default.
+
+## Phases 4–6 and release gates
+
+The admin console can manage employees, projects, project-access grants and canonical source mappings; it also produces date-filtered team summaries, charts and private snapshots. Operational tools show managed-tab metadata, audit configuration, list script triggers, create/verify explicitly enabled private TEST backups, and evaluate TEST readiness. These actions are admin-only and do not modify project task rows.
+
+The environment gate requires APP_ENV_LABEL=TEST, MASTER_SPREADSHEET_ID equal to TEST_MASTER_SPREADSHEET_ID, and the TEST data gate property true before app data can be used. A production setup must be separate: a distinct Apps Script project and private master spreadsheet, with APP_ENV_LABEL=PROD, MASTER_SPREADSHEET_ID equal to PROD_MASTER_SPREADSHEET_ID, and explicit production release approval only after review. Do not switch the current TEST project to PROD or put production IDs into TEST.
+
+The release checklist and configuration audit are evidence-gathering tools, not automatic approval. Human verification of permissions, runtime behavior, metric definitions, load, quotas, backups and restore recovery is still required. Do not merge the draft PR or deploy production merely because the dashboard loads.
 
 ## Security and release rules
 
