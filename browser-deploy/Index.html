@@ -81,6 +81,29 @@
       </div>
     </section>
   </section>
+    <section id="issuePanel" class="panel hidden">
+      <h2>Issue detection & turnaround time · Admin</h2>
+      <div class="muted">Scans configured task sources read-only and stores issue records in the private master. TAT is calculated only for rules configured in the TAT_Rules tab. A manual scan never sends email.</div>
+      <div id="issueStatus" class="status warn">Initialize Issue/TAT storage before the first scan.</div>
+      <div>
+        <button onclick="initializeIssueStorage()">Initialize issue/TAT storage</button>
+        <button onclick="runIssueScan()">Run issue/TAT scan</button>
+        <button onclick="loadIssueDashboard()">Refresh issue list</button>
+        <button onclick="previewIssueDigest()">Preview reminder digest</button>
+        <button onclick="sendIssueDigest()">Send reminder digest</button>
+      </div>
+      <div class="small">Email reminders are disabled unless Script Property ISSUE_EMAILS_ENABLED is exactly true. Scheduled scans are off by default and require a complete manual scan first.</div>
+      <label class="small" for="issueIntervalHours">Scheduled scan interval</label>
+      <select id="issueIntervalHours"><option value="6">Every 6 hours</option><option value="12">Every 12 hours</option></select>
+      <button onclick="enableIssueSchedule()">Enable scheduled scan</button>
+      <button onclick="disableIssueSchedule()">Disable scheduled scan</button>
+      <div id="issueSummary" class="small"></div>
+      <div id="issueDigestPreview" class="small"></div>
+      <div class="tablewrap" style="margin-top:12px"><table style="min-width:900px">
+        <thead><tr><th>Severity</th><th>Project</th><th>Dataset Set / Row</th><th>Issue</th><th>Assigned to</th><th>Details</th><th>Last seen</th><th>Action</th></tr></thead>
+        <tbody id="issueRows"><tr><td colspan="8">No issue scan loaded.</td></tr></tbody>
+      </table></div>
+    </section>
   <p class="small">TEST build only. Use synthetic data until browser-based access-code and privacy checks pass. Issue scanning, reminders, admin People/Projects management, reports, charts and snapshots are later phases.</p>
 </main>
 <script>
@@ -202,7 +225,14 @@
           ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
         setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
         document.getElementById('logoutButton').classList.remove('hidden');
-        if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
+        if(data.user.role==='admin') {
+          document.getElementById('attendanceAdminTools').classList.remove('hidden');
+          document.getElementById('issuePanel').classList.remove('hidden');
+          loadIssueDashboard();
+        } else {
+          document.getElementById('attendanceAdminTools').classList.add('hidden');
+          document.getElementById('issuePanel').classList.add('hidden');
+        }
         loadAttendance();
       }).withFailureHandler(function(error) {
         if(refresh) refresh.disabled=false;
@@ -212,6 +242,119 @@
       if(refresh) refresh.disabled=false;
       setStatus(error.message||String(error),'bad');
     }).getBootstrap(token);
+  }
+  function issueMessage(message, kind) {
+    var el=document.getElementById('issueStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function initializeIssueStorage() {
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).initializeIssueStorage(getToken());
+  }
+  function loadIssueDashboard() {
+    if(!getToken()) return;
+    google.script.run.withSuccessHandler(function(result) {
+      if(!result||!result.ok) {
+        issueMessage(result&&result.message?result.message:'Unable to load issue dashboard.','bad');
+        return;
+      }
+      if(!result.storageReady) {
+        issueMessage(result.message,'warn');
+        document.getElementById('issueRows').innerHTML='<tr><td colspan="8">Initialize issue/TAT storage to begin.</td></tr>';
+        document.getElementById('issueSummary').textContent='';
+        return;
+      }
+      var last=result.lastScan
+        ? ' · Last scan: '+result.lastScan.outcome+' at '+result.lastScan.finishedAt+' ('+result.lastScan.durationMs+' ms; '+result.lastScan.rowsScanned+' rows)'
+        : ' · No scan run yet';
+      document.getElementById('issueSummary').textContent=
+        'Open: '+result.summary.open+' · Critical: '+result.summary.critical+
+        ' · High: '+result.summary.high+' · Medium: '+result.summary.medium+
+        ' · Resolved: '+result.summary.resolved+last;
+      issueMessage(result.emailEnabled
+        ? 'Email reminders are enabled. Send only after reviewing the digest preview.'
+        : 'Email reminders are disabled. Manual scanning does not send email.',
+        result.emailEnabled?'warn':'');
+      if(result.scheduleEnabled) document.getElementById('issueSummary').textContent+=' · Scheduled scan enabled';
+      document.getElementById('issueRows').innerHTML=result.issues.length?result.issues.map(function(item) {
+        var label=item.datasetSetId?item.datasetSetId:('Row '+item.sourceRow);
+        return '<tr><td>'+escapeHtml(item.severity)+'</td><td>'+escapeHtml(item.projectName)+'</td><td>'+
+          escapeHtml(label)+'</td><td>'+escapeHtml(item.issueType)+'</td><td>'+escapeHtml(item.assignedTo)+'</td><td>'+
+          escapeHtml(item.details)+'</td><td>'+escapeHtml(item.lastSeenAt)+'</td><td><button onclick="resolveIssuePrompt(\\''+
+          escapeHtml(item.issueKey)+'\\')">Resolve</button></td></tr>';
+      }).join(''):'<tr><td colspan="8">No open issues found in the current scan.</td></tr>';
+      if(!result.scheduleEnabled) document.getElementById('issueIntervalHours').disabled=false;
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).getIssueDashboard(getToken());
+  }
+  function runIssueScan() {
+    issueMessage('Scanning configured project sources…','warn');
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message+' Issues found: '+result.issuesFound+
+        '; opened: '+result.issuesOpened+'; updated: '+result.issuesUpdated+
+        '; resolved: '+result.issuesResolved+'. Duration: '+result.durationMs+' ms.',
+        result.outcome==='COMPLETE'?'good':'warn');
+      if(result.projectErrors&&result.projectErrors.length) {
+        document.getElementById('issueDigestPreview').textContent='Scan notes: '+result.projectErrors.map(function(e) {
+          return e.projectId+': '+e.message;
+        }).join(' | ');
+      }
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).runIssueScan(getToken());
+  }
+  function previewIssueDigest() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('issueDigestPreview').textContent=
+        result.message+' Open issue entries: '+result.openIssues+'. Recipients: '+
+        (result.recipients.length?result.recipients.map(function(r){return r.email+' ('+r.issueCount+')';}).join(', '):'none');
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).previewIssueDigest(getToken());
+  }
+  function sendIssueDigest() {
+    if(!window.confirm('Send an issue digest email to active employees with open issues? A recipient is limited to one digest per day.')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,result.ok?'good':'warn');
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).sendIssueDigest(getToken());
+  }
+  function enableIssueSchedule() {
+    var hours=Number(document.getElementById('issueIntervalHours').value);
+    if(!window.confirm('Enable automatic issue/TAT scans every '+hours+' hours? Emails remain disabled unless ISSUE_EMAILS_ENABLED is explicitly true.')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).installIssueScanTrigger(getToken(),hours);
+  }
+  function disableIssueSchedule() {
+    if(!window.confirm('Disable scheduled issue/TAT scanning?')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).disableIssueScanTrigger(getToken());
+  }
+  function resolveIssuePrompt(issueKey) {
+    var note=window.prompt('Optional resolution note:');
+    if(note===null) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).resolveIssue(getToken(),issueKey,note);
   }
   function newRequestId() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID().replace(/-/g,'');
