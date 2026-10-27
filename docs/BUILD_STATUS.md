@@ -53,7 +53,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 3. **Task counts are source rows.** Distinct sets are counted by Project ID + Dataset Set ID. Confirm this is the intended counting unit.
 4. **Date fields are treated as date-only.** If a source column contains date-time values, this serializer intentionally presents the date portion only; confirm the source's actual semantics.
 5. **Required mappings are enforced for Set ID, Annotator Mail and Status.** The `Required` flag in Column_Map is documented for configuration but additional required-field validation belongs to the issue-scanner phase.
-6. **Reads are not chunked yet.** Each configured tab is read in one `getDataRange()` call. Large projects need load testing and a chunked scanner before wider rollout.
+6. **My Work reads are not chunked yet.** Phase 1 currently reads each configured task tab in one `getDataRange()` call. Phase 3 issue scanning is chunked; large My Work datasets still need load testing or a paginated/chunked design before wider rollout.
 7. **Partial totals can still be displayed.** The UI now labels them as partial and lists project failures. Do not use partial totals for decisions.
 8. **No automated Apps Script test runner is included.** Static inspection cannot prove deployment, authorization, quota, or Google Sheets runtime behavior.
 
