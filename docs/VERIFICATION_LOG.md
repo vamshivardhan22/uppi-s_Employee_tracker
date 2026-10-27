@@ -5,12 +5,13 @@ This log records checks run against code read back from the GitHub development b
 ## Current source under test
 
 - Branch: `build/phase-0-1-dashboard`
-- Browser bundle `browser-deploy/Main.gs` SHA: `3b786268167df18097a2381da2b089ca4d77ff25`
+- Browser bundle `browser-deploy/Main.gs` SHA: `6b6cd2f6065930243c77f793c467c0990c45be30`
 - Modular `apps-script/Auth.gs` SHA: `f68809bfa20ab54d4d9eb0589be8194e57617043`
 - Modular `apps-script/Attendance.gs` SHA: `237a5e52fb1d6adfe2ba9dd87e4b666ef74715f4`
+- Modular `apps-script/IssueScanner.gs` SHA: `389bd93a9fbaeabaa659a7c8a64b36f640c72f78`
 - Modular `apps-script/Code.gs` SHA: `6b30e23c1887420af3b9a393247e4de46a5657e7`
 - Modular `apps-script/UserApi.gs` SHA: `a3d38e14df704d37db0df1384392f0b6693b8584`
-- UI `apps-script/Index.html` SHA: `8fbc179f9030937b2c7b71dbe2ad5c872ac5f8d8`
+- UI `apps-script/Index.html` SHA: `0eccae7b7f1ebf7edc08bbf0cee2f0f768facf84`
 - No OS/terminal commands were used.
 - No external repositories were used as implementation or design references.
 
@@ -71,11 +72,17 @@ The current modular source was combined and run against in-memory mocks of Apps 
 27. Stale-session closure requires explicit approved configuration.
 28. Sign-out clears the server-side session.
 
-The browser bundle and inline JavaScript were also parsed successfully after the access-code refactor.
+The combined Apps Script bundle and inline JavaScript were parsed successfully after the Phase 3 update. The browser server bundle matches the concatenation of the current modular source files; browser and modular Index.html files match; the manifests match.
 
-These 28 mock checks were run before the live date-normalization regression was found. The updated date-normalization revision has **not yet** been rerun through the full mock harness or a syntax/parser check; passing live browser regression tests is still required.
+These 28 Phase 0–2 mock checks were run before the live date-normalization regression was found. They are not evidence that every current revision path is tested. The current Phase 3 combined bundle and inline UI passed syntax parsing, and a separate in-memory Phase 3 scanner smoke test is recorded below; live Phase 3 verification remains outstanding.
 
 **Limitations:** These checks use in-memory stand-ins, not real Google Apps Script services. They do not prove that Apps Script authorizations succeed, that the browser UI behaves correctly, or that real Sheets and Script Cache have identical behavior. Real concurrent calls, partial multi-tab write recovery, and deployed access settings still require TEST.
+
+
+
+## Phase 3 in-memory smoke test — passed (not live TEST)
+
+A harness with in-memory Sheets, Script Properties, LockService and Utilities ran the scanner against three synthetic task rows. The first complete scan opened two findings (`ANNOTATOR_NOT_ACTIVE` and a configured `TAT_BREACH`) and wrote a `COMPLETE` scan-run log. A second scan after correcting the synthetic row returned zero current findings and resolved the two prior issues. The scanner did not write to the source project sheet. These are code-level simulation results only; they do not prove live Apps Script behavior, actual quota use, TAT rules, or email delivery.
 
 ## Live TEST observations — 2026-10-27
 
@@ -103,10 +110,13 @@ These 28 mock checks were run before the live date-normalization regression was 
 **Do not merge or deploy to production yet.** Core Phase 0/1 and selected Phase 2 flows have been verified live using synthetic data; the 28/28 mock checks are separate and predate the date-normalization fix. Phase 2 edge-case tests and Phase 3–6 remain. Keep production blocked until critical access-control, concurrency, data-integrity, metric-definition, quota, backup/restore and pilot acceptance gates pass.
 
 
-## Live TEST regression discovered on 2026-10-27
+## Live TEST date-normalization regression — fixed and re-tested on 2026-10-27
 
-During browser-based Phase 2 testing, submitting another leave request for the same date as an already approved request created a new PENDING row. This is a failed live test, despite the earlier in-memory mock check. The row date was being read from Google Sheets as a JavaScript `Date` object, while the overlap logic accepted only string dates; the same assumption also caused long date strings in the UI.
+The first same-date overlap attempt created an extra pending row because Google Sheets returned date values as JavaScript `Date` objects while overlap logic assumed ISO strings. The fix normalizes sheet date values to `YYYY-MM-DD` before overlap checks, attendance status calculations and UI response construction. After deploying the corrected bundle, the duplicate attempt returned the expected overlap error and created no additional row. Admin rejected the one duplicate regression record through the app with the audit note `Duplicate created during regression test`; the original approved request remained unchanged.
 
-A fix has been applied to normalize sheet date values to `YYYY-MM-DD` before checking overlapping requests, computing today's leave status, or returning leave dates to the UI. Invalid dates in existing pending/approved requests now fail closed rather than being skipped. The labeller's redundant final status cell is also simplified.
+A valid and invalid short-leave time interval were also tested in the deployed UI. The optional reason and minor display issues are deferred to the planned polish version.
 
-**Re-test required:** copy the updated browser bundle into the TEST Apps Script project, deploy a new version, and verify that a same-date duplicate request is rejected without adding a row. The duplicate PENDING row already created during the test must be resolved by an Admin through the app (reject it with a note such as `Duplicate created during regression test`); do not delete audit rows manually. Production remains blocked until this browser-based regression is confirmed fixed.
+
+## Phase 3 deployment status
+
+Phase 3 source and Admin UI are committed on `build/phase-0-1-dashboard`, but the live TEST Apps Script project has not yet been updated to this revision. Parser checks and the synthetic in-memory smoke test passed. All Phase 3 live TEST items in Section I of `docs/TEST_PLAN.md` remain outstanding. Emails and scheduled triggers must remain disabled during initial TEST validation.
