@@ -38,6 +38,30 @@ This document describes the architecture agreed for this project. Implement the 
 - **Phase 5:** privacy, concurrent actions, duplicate/retry behavior, dates, timezones, edge cases, load, quotas, and backup/restore tests.
 - **Phase 6:** separate TEST and PROD projects and master spreadsheets, followed by a staged pilot before wider rollout.
 
+
+## Phase 4 admin, reporting and snapshot design
+
+- AdminConsole.gs exposes admin-only APIs for employee records, project metadata, project grants, canonical mappings, team reports and snapshots. UI visibility is convenience only; server endpoints call the admin-role guard independently.
+- Employee email and project-ID uniqueness, valid roles, required task mappings, self-demotion prevention and the last-active-admin rule are checked before writes. Deactivation invalidates access through the active-employee check and revokes project grants; access-code provisioning remains editor-only.
+- Admin_Audit_Log records admin actions and before/after summaries. If an audit write fails after an action saved, the response warns the operator to inspect both the entity and audit log before retrying.
+- Team reports read active configured task sources in 500-row batches, apply an optional date filter to the selected date field, and cap each project at ADMIN_REPORT_MAX_ROWS (default 25,000; configurable only within a bounded range). Hitting the cap or encountering a project error marks the report partial.
+- Team snapshots contain report aggregates and summary fields in Team_Snapshots. Snapshots are refused for partial reports and for JSON that exceeds the configured cell-size safety cap. They are operational snapshots inside the private master, not immutable external audit records or a backup.
+
+## Phase 5 operational readiness design
+
+- OperationsHealth.gs provides read-only operational metadata, source/mapping/configuration checks, a TEST readiness checklist and explicitly gated TEST backup create/verify actions.
+- A configuration audit checks duplicate people/projects/mappings, dangling grants, required mapping presence, readable project sources, active credentials and environment/master-ID separation. Its result is a diagnostic tool, not a substitute for live tests.
+- TEST backup creation requires an explicit TEST label, a matching TEST master, a passed environment gate, admin storage and TEST_BACKUP_ENABLED=true. It verifies the copied sheet has the required tabs and attempts to keep the copy private. The function does not restore a backup in place.
+- Script locks serialize calls within the same Apps Script project, but Sheets does not provide a multi-tab transaction. Concurrent action tests, write-failure injection, quota/load tests, and a separate restore drill remain required before rollout.
+
+## Phase 6 environment separation and release control
+
+- isIdentityGatePassed_ requires APP_ENV_LABEL=TEST and MASTER_SPREADSHEET_ID=TEST_MASTER_SPREADSHEET_ID for TEST. PROD requires the matching PROD_MASTER_SPREADSHEET_ID and PRODUCTION_RELEASE_APPROVED=true. Missing or mismatched environment bindings keep app data locked.
+- TEST must not contain a configured PROD master ID. A production rollout must use a distinct Apps Script project and private master; the code's property checks do not replace a human review of the actual deployment configuration.
+- Email reminders and scheduled issue scans are separately gated. The default is off; only explicit approval following live verification may enable them.
+- The admin release checklist is evidence of configuration state, not automatic approval. A human reviewer must verify all critical test cases, metrics, privacy boundaries, backup/restore, quotas, rollback and pilot acceptance.
+
+
 ## Metric assumptions requiring approval
 
 - Assigned tasks currently means source rows matching the authenticated email.
