@@ -4,7 +4,7 @@ Last updated: 2026-10-27
 
 ## Current repository state
 
-Phase 0/1 and Phase 2 source are committed on the development branch and have been deployed to a dedicated TEST Apps Script project. Browser-based live checks have verified authentication/session behavior, assigned-task isolation, clock-in/out, break start/end, leave submission and review, and the leave-overlap regression after its fix. Several Phase 2 edge cases and Phase 3–6 remain. No production deployment or merge has been performed.
+Phase 0/1 and Phase 2 source are deployed to a dedicated TEST Apps Script project. Browser-based live checks have verified authentication/session behavior, assigned-task isolation, clock-in/out, break start/end, leave submission/review, short-leave time validation and the leave-overlap regression after its fix. Phase 3 issue/TAT code is now added to the development branch and passed parser and in-memory scan smoke checks, but it has not yet been copied into the live TEST project or verified against live Sheets. No production deployment or merge has been performed.
 
 Development must follow the agreed six-phase plan. Do not use unrelated repository references or introduce features outside the agreed project requirements.
 
@@ -30,6 +30,8 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
 - Admin approve/reject actions for leave requests; labellers can only list their own requests.
 - Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
+- Phase 3 issue/TAT module (`IssueScanner.gs`): admin-only storage initialization, read-only chunked scans, stable issue keys, missing-data/assignment/hold findings, optional per-project/status TAT rules, scan-run duration and coverage logs, partial-run cursor, resolve action, daily-deduplicated reminder digest with MailApp quota check, and opt-in 6/12-hour scan trigger. Emails and triggers default to disabled.
+- Phase 3 synthetic in-memory smoke test: a 3-row fake source produced `ANNOTATOR_NOT_ACTIVE` and `TAT_BREACH`; a following scan after correcting the synthetic row marked both issues `RESOLVED`. This is not a live Apps Script test.
 - In-memory mocked verification: a previous revision passed combined Apps Script/inline JavaScript syntax checks and 28 access-code, session, task-isolation, attendance and leave behavior checks. Those results predate the live date-normalization regression fix; the corrected revision's complete mock/parser suite must be rerun. See `docs/VERIFICATION_LOG.md`.
 - Browser-only deployment bundle maintained under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML have been checked against modular sources at the matching revision.
 - `docs/BROWSER_ONLY_SETUP.md` describes browser-only setup. Live TEST now exists; remaining runtime edge checks are tracked in `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md`.
@@ -38,8 +40,8 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 
 - Automatic trigger installation for stale-session closure (planned in Phase 3); the closure function is not scheduled automatically.
 - Full admin attendance history/dashboard (Phase 4).
-- TAT calculations, issue lifecycle, duplicate task detection or validation reminders.
-- Scheduled scanner, email digests, quota-aware mail handling or heartbeat monitoring.
+- Duplicate task detection (needs a confirmed stable task key/business rule), validation-specific reminders and heartbeat monitoring.
+- Live deployment/runtime validation of Phase 3 scanning, TAT rules, digest delivery and scheduled-trigger behavior.
 - Admin People/Projects management or grant/revoke flows.
 - My Reports, attendance history, charts, snapshots or performance/load tests.
 - Remaining browser-based edge tests, production deployment or pilot. Core login, task-isolation and selected Phase 2 workflows have been tested live in the dedicated TEST deployment.
