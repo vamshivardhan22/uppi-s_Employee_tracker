@@ -292,7 +292,7 @@
   function loadLeaveRequests() {
     google.script.run.withSuccessHandler(function(result) {
       var isAdmin=result.role==='admin';
-      document.getElementById('leaveActionsHeader').textContent=isAdmin?'Review':'Details';
+      document.getElementById('leaveActionsHeader').textContent=isAdmin?'Review':'—';
       var body=document.getElementById('leaveRows');
       if(!result.rows.length) {
         body.innerHTML='<tr><td colspan="5">No leave requests found.</td></tr>';
@@ -304,7 +304,7 @@
           (row.reason?' · '+escapeHtml(row.reason):'')+(isAdmin&&row.email?' · '+escapeHtml(row.email):'');
         var actions=isAdmin&&row.status==='PENDING'
           ? '<button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'APPROVED\')">Approve</button><button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'REJECTED\')">Reject</button>'
-          : escapeHtml(row.status);
+          : '—';
         return '<tr><td>'+date+'</td><td>'+escapeHtml(row.leaveType.replace('_',' '))+'</td><td>'+escapeHtml(row.status)+'</td><td>'+details+'</td><td>'+actions+'</td></tr>';
       }).join('');
     }).withFailureHandler(function(error) {
