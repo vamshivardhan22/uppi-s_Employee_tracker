@@ -5,12 +5,12 @@ This log records checks run against code read back from the GitHub development b
 ## Current source under test
 
 - Branch: `build/phase-0-1-dashboard`
-- Browser bundle `browser-deploy/Main.gs` SHA: `90c820d2955849dc1d965295e14cbad1ec892f99`
+- Browser bundle `browser-deploy/Main.gs` SHA: `6be6580a78622abeb3cb47273a45390897c2b97a`
 - Modular `apps-script/Auth.gs` SHA: `f68809bfa20ab54d4d9eb0589be8194e57617043`
-- Modular `apps-script/Attendance.gs` SHA: `3c9b3266838108d4b0eb9d260dbc9be487824b69`
+- Modular `apps-script/Attendance.gs` SHA: `f01ad7c4ea103aa082a0abb33553e3008df719cf`
 - Modular `apps-script/Code.gs` SHA: `6b30e23c1887420af3b9a393247e4de46a5657e7`
 - Modular `apps-script/UserApi.gs` SHA: `a3d38e14df704d37db0df1384392f0b6693b8584`
-- UI `apps-script/Index.html` SHA: `ccbb7608afa468ef98f025bb77615615d37e46ce`
+- UI `apps-script/Index.html` SHA: `8fbc179f9030937b2c7b71dbe2ad5c872ac5f8d8`
 - No OS/terminal commands were used.
 - No external repositories were used as implementation or design references.
 
