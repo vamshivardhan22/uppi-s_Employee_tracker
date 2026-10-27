@@ -131,6 +131,7 @@ The current branch source was fetched again from GitHub after the Phase 4–6 do
 - `apps-script/Index.html` matches `browser-deploy/Index.html`; both manifests match.
 - The checked AdminConsole and OperationsHealth entry points all call the server-side `requireAdmin_` role guard. This is a source inspection, not a runtime authorization test.
 - Team-report daily trend grouping now uses the selected report date field (Assigned Date or Submitted Date), matching the selected reporting window; the change was syntax-checked but has not yet been verified against a live report.
+- An isolated in-memory report-builder smoke test used two synthetic rows and a one-day `Submitted Date` filter; it returned the matching single row and grouped the daily trend on that same submitted date. This verifies the pure aggregation path with stubs only, not live Google Sheets behavior.
 - The repository has no configured GitHub Actions workflows at the time of this check. No automated CI run validates Apps Script service behavior.
 - Source is present for Phases 0–6. Phase 0/1 and selected Phase 2 flows have live TEST evidence documented above. Phase 3–6 are not marked live-accepted: the updated bundle still needs to be copied into the TEST Apps Script project and tested through the deployed browser UI, followed by Phase 4–6 admin, operational, recovery, backup/restore and environment-separation checks.
 
