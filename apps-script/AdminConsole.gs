@@ -491,6 +491,13 @@ function adminValidateOptionalDate_(value, label) {
   return text;
 }
 
+function adminNumberProperty_(name, defaultValue, minValue, maxValue) {
+  const raw = PropertiesService.getScriptProperties().getProperty(name);
+  const value = Number(raw);
+  if (raw === null || raw === '' || !isFinite(value) || value < minValue || value > maxValue) return defaultValue;
+  return Math.floor(value);
+}
+
 function adminBuildTeamReport_(filters) {
   const opts = filters && typeof filters === 'object' ? filters : {};
   const fromDate = adminValidateOptionalDate_(opts.fromDate, 'Start date');
@@ -502,6 +509,7 @@ function adminBuildTeamReport_(filters) {
   const employees = adminEmployeeObjects_();
   const employeeByEmail = new Map(employees.map(item => [item.email, item]));
   const projects = adminProjectObjects_().filter(item => item.active);
+  const reportRowLimit = adminNumberProperty_('ADMIN_REPORT_MAX_ROWS', 25000, 1000, 50000);
   const byEmployee = new Map();
   const byProject = new Map();
   const byStatus = new Map();
@@ -515,72 +523,97 @@ function adminBuildTeamReport_(filters) {
 
   projects.forEach(project => {
     try {
-      const source = readProjectTable_(project);
+      const sourceSpreadsheet = SpreadsheetApp.openById(project.spreadsheetId);
+      const sourceSheet = sourceSpreadsheet.getSheetByName(project.tabName);
+      if (!sourceSheet) throw new Error('Configured source tab "' + project.tabName + '" was not found.');
+      const lastRow = sourceSheet.getLastRow();
+      const lastColumn = sourceSheet.getLastColumn();
+      if (lastRow < 1 || lastColumn < 1) throw new Error('Source tab has no header row.');
+      const headers = sourceSheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0]
+        .map(value => String(value == null ? '' : value).trim());
+      const nonBlankHeaders = headers.filter(Boolean).map(value => value.toLowerCase());
+      if (new Set(nonBlankHeaders).size !== nonBlankHeaders.length) {
+        throw new Error('Duplicate source header names were found.');
+      }
       const mapping = getColumnMappings_(project.projectId);
-      const setIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.SET_ID] || '');
-      const emailIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.ANNOTATOR_EMAIL] || '');
-      const statusIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.STATUS] || '');
+      const setIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.SET_ID] || '');
+      const emailIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.ANNOTATOR_EMAIL] || '');
+      const statusIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.STATUS] || '');
       if ([setIndex, emailIndex, statusIndex].some(index => index < 0)) {
         throw new Error('Required task fields are not fully mapped to source headers.');
       }
-      const dateIndex = findHeaderIndex_(source.headers, mapping[dateField] || '');
+      const dateIndex = findHeaderIndex_(headers, mapping[dateField] || '');
       if ((fromDate || toDate) && dateIndex < 0) {
         throw new Error('Date-filter field "' + dateField + '" is not mapped or its source header is missing.');
       }
+      const assignedIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.ASSIGNED_DATE] || '');
       const projectTotals = byProject.get(project.projectId) || {
         projectId: project.projectId, projectName: project.projectName,
         tasks: 0, completed: 0, sets: new Set()
       };
-      source.rows.forEach(row => {
-        const taskDate = dateIndex >= 0 ? adminDateOnly_(row[dateIndex], project.timeZone) : '';
-        if (fromDate || toDate) {
-          if (!taskDate || (fromDate && taskDate < fromDate) || (toDate && taskDate > toDate)) return;
-        }
-        const email = normalizeEmail_(row[emailIndex]);
-        const setId = safeText_(row[setIndex]);
-        const status = safeText_(row[statusIndex]) || '(blank)';
-        const statusLower = status.toLowerCase();
-        const completed = APP.COMPLETED_STATUSES.includes(statusLower);
-        totalTasks += 1;
-        if (completed) completedTasks += 1;
-        if (setId) {
-          rowsWithSetId += 1;
-          distinctSets.add(project.projectId + '|' + setId.toLowerCase());
-          projectTotals.sets.add(setId.toLowerCase());
-        }
-        if (email) rowsWithEmail += 1;
-        projectTotals.tasks += 1;
-        if (completed) projectTotals.completed += 1;
+      const availableRows = Math.max(0, lastRow - 1);
+      const rowsToRead = Math.min(availableRows, reportRowLimit);
+      for (let offset = 0; offset < rowsToRead; offset += 500) {
+        const count = Math.min(500, rowsToRead - offset);
+        const rows = sourceSheet.getRange(offset + 2, 1, count, lastColumn).getValues();
+        rows.forEach(row => {
+          if (!row.some(value => value !== '' && value !== null)) return;
+          const taskDate = dateIndex >= 0 ? adminDateOnly_(row[dateIndex], project.timeZone) : '';
+          if (fromDate || toDate) {
+            if (!taskDate || (fromDate && taskDate < fromDate) || (toDate && taskDate > toDate)) return;
+          }
+          const email = normalizeEmail_(row[emailIndex]);
+          const setId = safeText_(row[setIndex]);
+          const status = safeText_(row[statusIndex]) || '(blank)';
+          const statusLower = status.toLowerCase();
+          const completed = APP.COMPLETED_STATUSES.includes(statusLower);
+          totalTasks += 1;
+          if (completed) completedTasks += 1;
+          if (setId) {
+            rowsWithSetId += 1;
+            distinctSets.add(project.projectId + '|' + setId.toLowerCase());
+            projectTotals.sets.add(setId.toLowerCase());
+          }
+          if (email) rowsWithEmail += 1;
+          projectTotals.tasks += 1;
+          if (completed) projectTotals.completed += 1;
 
-        const priorStatus = byStatus.get(status) || { status: status, tasks: 0, completed: 0 };
-        priorStatus.tasks += 1;
-        if (completed) priorStatus.completed += 1;
-        byStatus.set(status, priorStatus);
+          const priorStatus = byStatus.get(status) || { status: status, tasks: 0, completed: 0 };
+          priorStatus.tasks += 1;
+          if (completed) priorStatus.completed += 1;
+          byStatus.set(status, priorStatus);
 
-        if (email) {
-          const employee = employeeByEmail.get(email);
-          const name = employee ? employee.displayName : email;
-          const person = byEmployee.get(email) || {
-            email: email, displayName: name, role: employee ? employee.role : 'unknown',
-            tasks: 0, completed: 0, open: 0, sets: new Set()
-          };
-          person.tasks += 1;
-          if (completed) person.completed += 1;
-          else person.open += 1;
-          if (setId) person.sets.add(project.projectId + '|' + setId.toLowerCase());
-          byEmployee.set(email, person);
-        }
+          if (email) {
+            const employee = employeeByEmail.get(email);
+            const name = employee ? employee.displayName : email;
+            const person = byEmployee.get(email) || {
+              email: email, displayName: name, role: employee ? employee.role : 'unknown',
+              tasks: 0, completed: 0, open: 0, sets: new Set()
+            };
+            person.tasks += 1;
+            if (completed) person.completed += 1;
+            else person.open += 1;
+            if (setId) person.sets.add(project.projectId + '|' + setId.toLowerCase());
+            byEmployee.set(email, person);
+          }
 
-        const assignedIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.ASSIGNED_DATE] || '');
-        const assignedDate = assignedIndex >= 0 ? adminDateOnly_(row[assignedIndex], project.timeZone) : '';
-        if (assignedDate) {
-          const point = trend.get(assignedDate) || { date: assignedDate, tasks: 0, completed: 0 };
-          point.tasks += 1;
-          if (completed) point.completed += 1;
-          trend.set(assignedDate, point);
-        }
-      });
+          const assignedDate = assignedIndex >= 0 ? adminDateOnly_(row[assignedIndex], project.timeZone) : '';
+          if (assignedDate) {
+            const point = trend.get(assignedDate) || { date: assignedDate, tasks: 0, completed: 0 };
+            point.tasks += 1;
+            if (completed) point.completed += 1;
+            trend.set(assignedDate, point);
+          }
+        });
+      }
       byProject.set(project.projectId, projectTotals);
+      if (availableRows > reportRowLimit) {
+        projectErrors.push({
+          projectId: project.projectId, projectName: project.projectName,
+          message: 'Report safety limit reached: processed ' + reportRowLimit + ' of ' + availableRows +
+            ' source rows. Narrow the date range or increase ADMIN_REPORT_MAX_ROWS after load testing.'
+        });
+      }
     } catch (error) {
       projectErrors.push({
         projectId: project.projectId, projectName: project.projectName,
