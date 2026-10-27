@@ -37,8 +37,11 @@ Create a separate fake project spreadsheet containing a task tab with headers th
 
 In the Apps Script editor, open **Project Settings → Script Properties** and set:
 
+- `APP_ENV_LABEL` = `TEST`.
 - `MASTER_SPREADSHEET_ID` = the ID of the private TEST master spreadsheet.
-- `IDENTITY_GATE_PASSED` = `false`.
+- `TEST_MASTER_SPREADSHEET_ID` = the same ID as `MASTER_SPREADSHEET_ID`.
+- `IDENTITY_GATE_PASSED` = `false` during authentication tests.
+- Do not configure `PROD_MASTER_SPREADSHEET_ID` in TEST. Keep `ISSUE_EMAILS_ENABLED`, `ISSUE_SCAN_TRIGGER_ENABLED` and `TEST_BACKUP_ENABLED` unset or `false` unless that exact test has separate approval.
 
 The master spreadsheet ID is the portion between `/d/` and `/edit` in its browser URL. Keep the master private; do not put its ID in HTML or share the sheet with labellers.
 
@@ -91,6 +94,23 @@ Phase 3 is implemented on the development branch, but it is not considered live-
 8. **Do not enable `ISSUE_EMAILS_ENABLED` or install a schedule yet.** Preview the digest first. Manual scans never send email. Scheduled scans remain off unless an Admin explicitly installs a 6- or 12-hour trigger after a complete manual scan and all live checks are accepted.
 
 Use synthetic data only. If a scan is partial, has project errors, or produces unexpected findings, keep email/scheduling off and record the visible message for troubleshooting.
+
+
+## 7. Update and test Phases 4–6 in TEST
+
+The latest browser bundle includes the admin console, reports/snapshots, operational health, configuration audit, TEST backup helpers and release-readiness checks.
+
+1. Copy the current complete browser-deploy/Main.gs and browser-deploy/Index.html into the existing TEST Apps Script project. Save both files and deploy a **new version** from Manage deployments. Preserve execute-as-owner and signed-in-Google-account-only access. Do not use an anonymous/public deployment.
+2. Check Script Properties before testing. Set APP_ENV_LABEL=TEST; make MASTER_SPREADSHEET_ID and TEST_MASTER_SPREADSHEET_ID exactly the same private TEST spreadsheet ID; and keep IDENTITY_GATE_PASSED=false during authentication tests. The current environment-bound source intentionally keeps the data gate closed if these values are absent or mismatched.
+3. After authentication/privacy tests pass, set IDENTITY_GATE_PASSED=true for TEST data-flow checks. Sign in as Admin; click **Initialize admin storage**. Verify Admin_Audit_Log, Team_Snapshots and Backup_Log were created without overwriting existing tabs with unexpected headers.
+4. With synthetic users and synthetic projects, test employee create/update/deactivation, the last-admin and self-demotion guard, project create/update/deactivation, access grants/revocation and required column mappings. Verify a deactivated user cannot access their previous project data.
+5. Run team reports for hand-checkable date windows using Assigned Date and Submitted Date. Check totals against the synthetic source. Force a source error and row cap; the result must be marked partial. Do not save a snapshot from a partial report.
+6. Run **Operational health**, **Configuration audit** and **Refresh TEST checklist**. Expected blockers are acceptable while setup is incomplete; do not treat a passing checklist as production approval.
+7. Do not create a backup until a separate synthetic-data backup drill is approved. To run it, set TEST_BACKUP_ENABLED=true only in TEST, create a private copy, verify its privacy and required tabs, then unset/disable the property. Conduct any restore test with a separate test copy/project; never overwrite the active master.
+8. Keep email and scheduled scans disabled. Do not store a PROD master ID in TEST. Phase 6 requires a separate PROD Apps Script project and private PROD master only after a human release review.
+
+Report the visible error text or test result only. Do not share access codes, session tokens, employee data or the private master.
+
 
 ## Official Google instructions
 
