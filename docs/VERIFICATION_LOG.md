@@ -5,12 +5,14 @@ This log records checks run against code read back from the GitHub development b
 ## Current source under test
 
 - Branch: `build/phase-0-1-dashboard`
-- Browser bundle `browser-deploy/Main.gs` SHA: `edd1e7f51da28f5c60ddcd9b8b80ea65ab292fc0`
+- Browser bundle `browser-deploy/Main.gs` SHA: `ca1986475463fe56baa6ea99b67ac1db12b5bb03`
 - Modular `apps-script/Auth.gs` SHA: `f68809bfa20ab54d4d9eb0589be8194e57617043`
 - Modular `apps-script/Attendance.gs` SHA: `237a5e52fb1d6adfe2ba9dd87e4b666ef74715f4`
 - Modular `apps-script/IssueScanner.gs` SHA: `cfdb8ba43f48393f027637638c5b5fdf6c09487c`
 - Modular `apps-script/Code.gs` SHA: `6b30e23c1887420af3b9a393247e4de46a5657e7`
 - Modular `apps-script/UserApi.gs` SHA: `a3d38e14df704d37db0df1384392f0b6693b8584`
+- Modular `apps-script/AdminConsole.gs` SHA: `53d8c65f05fa4d561f4bd0e5abf03e7a162dffdc`
+- Modular `apps-script/OperationsHealth.gs` SHA: `010d27167facb8541ab2130612a5a707058dd551`
 - UI `apps-script/Index.html` SHA: `2b9a7f7c882b40ba6ea2e521567f485ced067873`
 - No OS/terminal commands were used.
 - No external repositories were used as implementation or design references.
@@ -122,12 +124,13 @@ A valid and invalid short-leave time interval were also tested in the deployed U
 Phase 3 source and Admin UI are committed on `build/phase-0-1-dashboard`, but the live TEST Apps Script project has not yet been updated to this revision. Parser checks and the synthetic in-memory smoke test passed. All Phase 3 live TEST items in Section I of `docs/TEST_PLAN.md` remain outstanding. Emails and scheduled triggers must remain disabled during initial TEST validation.
 ## Current source audit — 2026-10-27
 
-The current branch source was fetched again from GitHub after the Phase 4–6 documentation and UI-label updates.
+The current branch source was fetched again from GitHub after the Phase 4–6 documentation, UI-label and Phase 4 trend-grouping updates.
 
 - Syntax parsing passed for the concatenated modular Apps Script source, `browser-deploy/Main.gs`, and the dashboard inline JavaScript.
 - The 11 source blocks embedded in `browser-deploy/Main.gs` matched their corresponding modular source files after normalizing only separator newlines.
 - `apps-script/Index.html` matches `browser-deploy/Index.html`; both manifests match.
 - The checked AdminConsole and OperationsHealth entry points all call the server-side `requireAdmin_` role guard. This is a source inspection, not a runtime authorization test.
+- Team-report daily trend grouping now uses the selected report date field (Assigned Date or Submitted Date), matching the selected reporting window; the change was syntax-checked but has not yet been verified against a live report.
 - The repository has no configured GitHub Actions workflows at the time of this check. No automated CI run validates Apps Script service behavior.
 - Source is present for Phases 0–6. Phase 0/1 and selected Phase 2 flows have live TEST evidence documented above. Phase 3–6 are not marked live-accepted: the updated bundle still needs to be copied into the TEST Apps Script project and tested through the deployed browser UI, followed by Phase 4–6 admin, operational, recovery, backup/restore and environment-separation checks.
 
