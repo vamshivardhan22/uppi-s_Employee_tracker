@@ -22,11 +22,12 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Add exactly one active Employees row per test account, with role `admin` or `labeller`.
 - [ ] For each synthetic test employee, set Script Property `ACCESS_CODE_FOR_EMAIL` to their email and run editor-only `provisionEmployeeAccessCode_()`; the helper deletes the temporary property after issuing the code.
 - [ ] Deliver the logged one-time code privately; do not store the plaintext in Sheets or GitHub.
-- [ ] Correct email + correct code signs in; wrong code, malformed code, unknown employee, inactive employee and duplicate employee rows fail closed with no role/data leakage.
+- [x] Correct email + correct code signs in for both Admin and Labeller; a wrong access code was rejected in the deployed TEST UI.
+- [ ] Malformed code, unknown employee, inactive employee and duplicate employee rows fail closed with no role/data leakage.
 - [ ] The login response returns a random session token; the server stores session state in Script Cache and does not accept a client-supplied role.
 - [ ] No data API returns task/attendance data while the gate is false, even with a valid login token.
-- [ ] Rotate a code and confirm existing sessions for that employee are invalidated.
-- [ ] Confirm sign-out removes the server-side session.
+- [x] Rotate a code and confirm the previously active Labeller session becomes invalid after refresh; the new code can sign in.
+- [x] Confirm sign-out removes the server-side session; after refresh the app displayed “Sign in required.”
 - [ ] Open the deployed TEST `/exec` URL with the intended “Google account required” audience. Verify app-level access code works with personal Gmail accounts; this is not Google SSO and does not prove the browser's Google session email matches the typed email.
 - [ ] Only after these checks pass, set `IDENTITY_GATE_PASSED=true` in TEST and proceed to the Phase 1/2 data tests.
 
@@ -36,7 +37,8 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Unknown, inactive, duplicate employee rows and invalid roles are denied.
 - [ ] Client changes to the token, email, role or displayed UI cannot grant access; the server validates its cached session and loads the identity from the credential/employee records.
 - [ ] Only projects with an active Access row for the authenticated user are read.
-- [ ] Rows assigned to another email never appear; email matching trims surrounding whitespace and ignores case.
+- [x] Rows assigned to another email never appear in the live synthetic project test; the Labeller saw 2 assigned rows while the third employee's row stayed hidden.
+- [ ] Live edge test for email whitespace/case normalization.
 - [ ] A source read failure is shown as an error and marks totals as partial.
 
 ## D. Mapping and metrics
@@ -66,7 +68,8 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Only an authenticated active employee can write attendance actions.
 - [ ] Attendance events use server-generated timestamps in `Asia/Kolkata`.
 - [ ] Concurrent duplicate clock-in/out requests do not create inconsistent sessions.
-- [ ] Break start/end rules prevent overlapping or unmatched breaks.
+- [x] A tea break was recorded as `OPEN`, then the same row was changed to `CLOSED` with an end timestamp/request ID.
+- [ ] Verify duplicate/unmatched break actions and clock-out while a break is active are rejected in live TEST.
 - [ ] A retry of the same action does not double-write events.
 - [ ] Full-day, half-day and short leave rules follow the agreed definitions.
 - [ ] Stale open sessions follow the agreed auto-close policy and preserve an audit trail.
@@ -78,18 +81,22 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Initialization does not overwrite any existing tab with unexpected headers or data.
 - [ ] Direct attendance API calls fail when the identity gate is closed.
 - [ ] Unauthenticated, inactive, duplicate employee and non-admin review calls are denied.
-- [ ] Clock-in creates one open session with a server-generated timestamp and event.
+- [x] Clock-in created an `OPEN` session with a recorded server timestamp in the live TEST master.
+- [ ] Confirm a corresponding event row and verify server-side behavior under duplicate concurrent clock-in.
 - [ ] Replaying the same request ID and action returns the original result without adding rows.
 - [ ] Reusing a request ID for a different action is rejected.
 - [ ] Concurrent clock-in requests create at most one open session for the employee.
 - [ ] Clock-out is rejected while a break is open.
 - [ ] A second break cannot start until the first is ended; unmatched break-end is rejected.
 - [ ] Clock-in is rejected while a prior-day session remains open; no guessed clock-out time is inserted.
-- [ ] Full-day leave accepts a valid date range; half-day leave requires one date and AM/PM; short leave requires one date and valid increasing times.
-- [ ] Leave requests cannot be submitted for past dates or overlap another pending/approved request for that employee, even when Google Sheets returns date cells as `Date` objects rather than ISO strings.
-- [ ] Regression test: after one same-day leave request is pending/approved, a second overlapping request is rejected and does not append a new row.
-- [ ] Leave request dates returned to the UI are normalized to `YYYY-MM-DD` and do not render as long JavaScript date strings.
-- [ ] Labellers can only read their own leave requests; admin review is role-checked and only pending requests can be reviewed.
+- [x] Full-day leave was submitted and approved by Admin in live TEST.
+- [x] Short leave with an end time earlier than the start time was rejected; a valid increasing interval was accepted.
+- [ ] Half-day leave requires one date and AM/PM.
+- [ ] Leave requests cannot be submitted for past dates.
+- [x] Overlap regression was fixed and retested: a repeated same-date request was blocked, and the sheet had no extra row from the latest blocked attempt.
+- [ ] Confirm leave dates returned to the UI are normalized to `YYYY-MM-DD` after the latest bundle deployment.
+- [x] In the live UI, the Labeller could see their own approved leave request without Approve/Reject controls; Admin successfully approved a pending request.
+- [ ] Attempt direct-call authorization checks and verify that only pending requests can be reviewed at the server layer.
 - [ ] Event log records clock-in/out, break start/end, leave request/review, and auto-close events.
 - [ ] `ATTENDANCE_MAX_SESSION_HOURS` missing or outside 1–24 causes stale-session closure to fail safely.
 - [ ] With an approved max-session setting, stale sessions close at the configured duration and record the actual closure time/reason separately.
