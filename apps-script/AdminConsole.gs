@@ -546,7 +546,6 @@ function adminBuildTeamReport_(filters) {
       if ((fromDate || toDate) && dateIndex < 0) {
         throw new Error('Date-filter field "' + dateField + '" is not mapped or its source header is missing.');
       }
-      const assignedIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.ASSIGNED_DATE] || '');
       const projectTotals = byProject.get(project.projectId) || {
         projectId: project.projectId, projectName: project.projectName,
         tasks: 0, completed: 0, sets: new Set()
@@ -597,12 +596,12 @@ function adminBuildTeamReport_(filters) {
             byEmployee.set(email, person);
           }
 
-          const assignedDate = assignedIndex >= 0 ? adminDateOnly_(row[assignedIndex], project.timeZone) : '';
-          if (assignedDate) {
-            const point = trend.get(assignedDate) || { date: assignedDate, tasks: 0, completed: 0 };
+          const trendDate = dateIndex >= 0 ? adminDateOnly_(row[dateIndex], project.timeZone) : '';
+          if (trendDate) {
+            const point = trend.get(trendDate) || { date: trendDate, tasks: 0, completed: 0 };
             point.tasks += 1;
             if (completed) point.completed += 1;
-            trend.set(assignedDate, point);
+            trend.set(trendDate, point);
           }
         });
       }
