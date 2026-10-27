@@ -20,7 +20,7 @@
   </style>
 </head>
 <body><main>
-  <header><div><h1>Labeller Dashboard</h1><div class="muted">Work overview · Phase 0/1</div></div><div id="phase" class="small">Identity check</div></header>
+  <header><div><h1>Labeller Dashboard</h1><div class="muted">Work overview · Phases 0–3 (TEST)</div></div><div id="phase" class="small">Identity check</div></header>
   <section id="loginPanel" class="panel">
     <h2>Employee sign-in</h2>
     <div class="muted">Use the email on your active Employees record and the unique access code privately issued by the administrator. This code is not your Google password.</div>
@@ -104,7 +104,7 @@
         <tbody id="issueRows"><tr><td colspan="8">No issue scan loaded.</td></tr></tbody>
       </table></div>
     </section>
-  <p class="small">TEST build only. Use synthetic data until browser-based access-code and privacy checks pass. Issue scanning, reminders, admin People/Projects management, reports, charts and snapshots are later phases.</p>
+  <p class="small">TEST build only. Use synthetic data. Phase 3 issue/TAT scanning is admin-only; email reminders and scheduled scans are disabled unless explicitly enabled and verified. Admin People/Projects management, reports, charts and snapshots are later phases.</p>
 </main>
 <script>
   function escapeHtml(value) {
@@ -276,18 +276,18 @@
         'Open: '+result.summary.open+' · Critical: '+result.summary.critical+
         ' · High: '+result.summary.high+' · Medium: '+result.summary.medium+
         ' · Resolved: '+result.summary.resolved+last;
-      issueMessage(result.emailEnabled
-        ? 'Email reminders are enabled. Send only after reviewing the digest preview.'
-        : 'Email reminders are disabled. Manual scanning does not send email.',
-        result.emailEnabled?'warn':'');
-      if(result.scheduleEnabled) document.getElementById('issueSummary').textContent+=' · Scheduled scan enabled';
+      document.getElementById('issueSummary').textContent+=' · Email reminders: '+(result.emailEnabled?'ENABLED':'disabled')+
+        ' · Scheduled scan: '+(result.scheduleEnabled?'enabled':'disabled');
+      if(document.getElementById('issueStatus').textContent.indexOf('Initialize Issue/TAT storage')===0) {
+        issueMessage('Issue/TAT storage is ready. Run a manual scan to start.','good');
+      }
       document.getElementById('issueRows').innerHTML=result.issues.length?result.issues.map(function(item) {
         var label=item.datasetSetId?item.datasetSetId:('Row '+item.sourceRow);
         return '<tr><td>'+escapeHtml(item.severity)+'</td><td>'+escapeHtml(item.projectName)+'</td><td>'+
           escapeHtml(label)+'</td><td>'+escapeHtml(item.issueType)+'</td><td>'+escapeHtml(item.assignedTo)+'</td><td>'+
           escapeHtml(item.details)+'</td><td>'+escapeHtml(item.lastSeenAt)+'</td><td><button onclick="resolveIssuePrompt(&#39;'+
           escapeHtml(item.issueKey)+'&#39;)">Resolve</button></td></tr>';
-      }).join(''):'<tr><td colspan="8">No open issues found in the current scan.</td></tr>';
+      }).join(''):'<tr><td colspan="8">'+(result.lastScan?'No open issues found in the latest recorded scan.':'No scan run yet.')+'</td></tr>';
       if(!result.scheduleEnabled) document.getElementById('issueIntervalHours').disabled=false;
     }).withFailureHandler(function(error) {
       issueMessage(error.message||String(error),'bad');
