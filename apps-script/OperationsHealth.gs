@@ -172,14 +172,15 @@ function runConfigurationAudit(authToken) {
   const blockers = checks.filter(item => item.severity === 'BLOCKER' && !item.passed).length;
   const warnings = checks.filter(item => item.severity === 'WARNING' && !item.passed).length;
   const summary = { checks: checks.length, passed: checks.filter(item => item.passed).length, blockers: blockers, warnings: warnings };
-  adminWriteAudit_(actor, 'CONFIGURATION_AUDIT_RUN', 'CONFIGURATION', 'MASTER',
+  const auditWarning = adminWriteAuditSafely_(actor, 'CONFIGURATION_AUDIT_RUN', 'CONFIGURATION', 'MASTER',
     null, { summary: summary });
   return {
     ok: true, summary: summary, checks: checks, sourceChecks: sourceChecks,
     passed: blockers === 0,
-    message: blockers === 0
+    auditWarning: auditWarning,
+    message: (blockers === 0
       ? 'Configuration audit found no blockers. Review warnings and live-test limitations before release.'
-      : 'Configuration audit found ' + blockers + ' blocker(s). Do not promote this environment.'
+      : 'Configuration audit found ' + blockers + ' blocker(s). Do not promote this environment.') + auditWarning
   };
 }
 
