@@ -531,6 +531,9 @@ function issuePersistScan_(context, startedAt, scanId, elapsedMs, cursor) {
     }
 
     const finishedAt = issueNow_();
+    elapsedMs = Date.now() - startedAt.getTime();
+    const coverageGap = context.fullProjectsCompleted.size < context.activeProjectCount;
+    const runOutcome = context.truncated || context.projectErrors.length || coverageGap ? 'PARTIAL' : 'COMPLETE';
     const run = {
       'Scan ID': scanId,
       'Started At': startedAt,
@@ -547,7 +550,7 @@ function issuePersistScan_(context, startedAt, scanId, elapsedMs, cursor) {
       'Truncated': Boolean(context.truncated),
       'Next Project ID': cursor && cursor.projectId || '',
       'Next Row': cursor && cursor.rowNumber || '',
-      'Outcome': context.truncated || context.projectErrors.length ? 'PARTIAL' : 'COMPLETE'
+      'Outcome': runOutcome
     };
     const runHeaders = sheets[ISSUE_SCAN.SHEETS.RUNS].headers;
     sheets[ISSUE_SCAN.SHEETS.RUNS].sheet.appendRow(runHeaders.map(header =>
@@ -599,11 +602,13 @@ function issueRunScanInternal_() {
     activeEmployeeEmails: issueGetActiveEmployeeEmails_(),
     rowsScanned: 0,
     projectsAttempted: 0,
+    activeProjectCount: 0,
     truncated: false
   };
   let cursor = null;
   try {
     const projectList = issueActiveProjects_();
+    context.activeProjectCount = projectList.length;
     const ruleRead = issueReadTATRules_();
     ruleRead.errors.forEach(error => {
       context.projectErrors.push(error);
@@ -718,11 +723,11 @@ function issueRunScanInternal_() {
     } else {
       cursor = projectList.length ? { projectId: projectList[0].projectId, rowNumber: 2 } : null;
     }
+    const elapsed = Date.now() - startMillis;
+    const result = issuePersistScan_(context, startedAt, scanId, elapsed, context.truncated ? cursor : null);
     if (cursor && cursor.projectId) properties.setProperty(ISSUE_SCAN.CURSOR_PROPERTY, JSON.stringify(cursor));
     else properties.deleteProperty(ISSUE_SCAN.CURSOR_PROPERTY);
-
-    const elapsed = Date.now() - startMillis;
-    return issuePersistScan_(context, startedAt, scanId, elapsed, context.truncated ? cursor : null);
+    return result;
   } finally {
     issueReleaseRunLease_(leaseId);
   }
