@@ -38,7 +38,7 @@ The current implementation uses app-level access-code authentication instead of 
 - `IDENTITY_GATE_PASSED` blocks task and attendance data endpoints until the administrator enables the TEST data gate.
 - The docs and code avoid the five unrelated repositories the user explicitly rejected.
 
-## Phase 0–2 in-memory behavior checks — 28/28 passed
+## Previous revision: Phase 0–2 in-memory behavior checks — 28/28 passed
 
 The current modular source was combined and run against in-memory mocks of Apps Script, Sheets, Script Properties, Cache and locking:
 
@@ -72,6 +72,8 @@ The current modular source was combined and run against in-memory mocks of Apps 
 28. Sign-out clears the server-side session.
 
 The browser bundle and inline JavaScript were also parsed successfully after the access-code refactor.
+
+These 28 mock checks were run before the live date-normalization regression was found. The updated date-normalization revision has **not yet** been rerun through the full mock harness or a syntax/parser check; passing live browser regression tests is still required.
 
 **Limitations:** These checks use in-memory stand-ins, not real Google Apps Script services. They do not prove that Apps Script authorizations succeed, that the browser UI behaves correctly, or that real Sheets and Script Cache have identical behavior. Real concurrent calls, partial multi-tab write recovery, and deployed access settings still require TEST.
 
