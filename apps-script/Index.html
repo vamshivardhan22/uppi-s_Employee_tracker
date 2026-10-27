@@ -145,7 +145,7 @@
         <div class="admin-card">
           <h3>Source column mapping</h3>
           <div class="admin-fields">
-            <label>Project<select id="adminMappingProject"></select></label>
+            <label>Project<select id="adminMappingProject" onchange="updateAdminMappingRequired()"></select></label>
             <label>Canonical field<select id="adminMappingCanonical" onchange="updateAdminMappingRequired()">
               <option>Dataset Set Id</option><option>Annotator Mail</option><option>Status</option>
               <option>Assigned Date</option><option>Submitted Date</option><option>Approved Objects</option>
@@ -196,6 +196,18 @@
           <div id="adminHealthRows"></div>
           <div id="adminAuditRows"></div>
           <div id="adminReleaseRows"></div>
+        </div>
+        <div class="admin-card">
+          <h3>Private TEST backup & restore drill</h3>
+          <div class="small">Backups include access hashes and private operational records. Creation is blocked unless the project is explicitly labeled TEST and TEST_BACKUP_ENABLED=true. Restore is a separate manual drill; this app never overwrites an active master in place.</div>
+          <button onclick="createAdminPrivateBackup()">Create private TEST backup</button>
+          <div class="admin-fields">
+            <label>Backup spreadsheet ID<input id="adminBackupSpreadsheetId" type="text" placeholder="ID from the backup URL"></label>
+            <label>Verification<div><button onclick="verifyAdminPrivateBackup()">Verify backup privacy and tabs</button></div></label>
+          </div>
+          <div id="adminBackupStatus" class="status">No backup action run.</div>
+          <button onclick="loadAdminBackups()">Refresh backup log</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Created at</th><th>Created by</th><th>Backup ID</th><th>Status</th><th>Open</th></tr></thead><tbody id="adminBackupRows"><tr><td colspan="5">No backups loaded.</td></tr></tbody></table></div>
         </div>
       </div>
     </section>
@@ -573,12 +585,16 @@
       adminStorageReady=Boolean(result.storageReady);
       populateAdminSelectors();
       renderAdminEmployees(); renderAdminProjects(); renderAdminAccess(); renderAdminMappings();
-      document.getElementById('adminMappingProject').addEventListener('change',updateAdminMappingRequired);
       if(adminStorageReady) {
         adminMessage('Admin storage ready. Employee/project changes are audit logged. New employees still need access-code provisioning.','good');
+        loadAdminSnapshots();
+        loadAdminBackups();
+        loadAdminReleaseChecklist();
       } else {
         adminMessage('Initialize admin storage before saving changes. Missing tabs: '+(result.missingStorage||[]).join(', '),'warn');
       }
+      loadTeamReport();
+      refreshAdminHealth();
       updateAdminMappingRequired();
     }).withFailureHandler(function(error) {
       adminMessage(error.message||String(error),'bad');
@@ -797,6 +813,48 @@
     }).withFailureHandler(function(error) {
       document.getElementById('adminReleaseRows').textContent=error.message||String(error);
     }).getReleaseChecklist(getToken());
+  }
+  function adminBackupMessage(message,kind) {
+    var el=document.getElementById('adminBackupStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function createAdminPrivateBackup() {
+    if(!window.confirm('Create a private copy of the entire TEST master spreadsheet? This copy includes employee records and access-code hashes.')) return;
+    adminBackupMessage('Creating and verifying private TEST backup…','warn');
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminBackupSpreadsheetId').value=result.spreadsheetId;
+      document.getElementById('adminBackupStatus').innerHTML=escapeHtml(result.message)+
+        ' <a href="'+escapeHtml(result.url)+'" target="_blank" rel="noopener">Open private backup</a>';
+      adminBackupMessage(result.message+' Backup ID: '+result.backupId,'good');
+      document.getElementById('adminBackupStatus').innerHTML=escapeHtml(result.message)+
+        ' <a href="'+escapeHtml(result.url)+'" target="_blank" rel="noopener">Open private backup</a>';
+      loadAdminBackups();refreshAdminHealth();
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).createPrivateTestBackup(getToken());
+  }
+  function verifyAdminPrivateBackup() {
+    var id=document.getElementById('adminBackupSpreadsheetId').value.trim();
+    if(!id){adminBackupMessage('Enter the backup spreadsheet ID first.','bad');return;}
+    google.script.run.withSuccessHandler(function(result) {
+      adminBackupMessage(result.message+' File: '+result.name+' · Tabs: '+result.tabCount,'good');
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).verifyPrivateTestBackup(getToken(),id);
+  }
+  function loadAdminBackups() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminBackupRows').innerHTML=result.backups&&result.backups.length
+        ? result.backups.map(function(item) {
+          return '<tr><td>'+escapeHtml(item.createdAt)+'</td><td>'+escapeHtml(item.createdBy)+'</td><td>'+
+            escapeHtml(item.backupSpreadsheetId)+'</td><td>'+escapeHtml(item.status)+'</td><td>'+
+            (item.url?'<a href="'+escapeHtml(item.url)+'" target="_blank" rel="noopener">Open</a>':'—')+'</td></tr>';
+        }).join('')
+        : '<tr><td colspan="5">No backups logged.</td></tr>';
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).listPrivateTestBackups(getToken());
   }
   function newRequestId() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID().replace(/-/g,'');
