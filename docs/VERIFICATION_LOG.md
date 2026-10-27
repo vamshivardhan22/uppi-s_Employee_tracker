@@ -77,19 +77,30 @@ These 28 mock checks were run before the live date-normalization regression was 
 
 **Limitations:** These checks use in-memory stand-ins, not real Google Apps Script services. They do not prove that Apps Script authorizations succeed, that the browser UI behaves correctly, or that real Sheets and Script Cache have identical behavior. Real concurrent calls, partial multi-tab write recovery, and deployed access settings still require TEST.
 
-## Still required in Google Apps Script TEST
+## Live TEST observations — 2026-10-27
 
-- Create `Employee_Credentials` using editor-only `initializeAuthStorage_()`.
-- Provision synthetic admin and labeller codes by setting `ACCESS_CODE_FOR_EMAIL` and running editor-only `provisionEmployeeAccessCode_()`; deliver codes privately.
-- While the data gate is false, verify valid and invalid sign-in, inactive/duplicate users, sign-out, code rotation and data API denial.
-- Deploy the web app as the script owner and restrict the audience to signed-in Google accounts (not anonymous access).
-- Only after authentication checks pass, set `IDENTITY_GATE_PASSED=true` in TEST and verify Phase 1 row isolation and Phase 2 attendance/leave behavior against synthetic sheets.
-- Test concurrent requests and recovery if a multi-tab write fails partway through.
-- Approve `ATTENDANCE_MAX_SESSION_HOURS` before using stale-session closure; trigger installation belongs to Phase 3.
+### Confirmed in the deployed browser app
+- Admin and Labeller signed in with their own access codes; an incorrect code was rejected.
+- Sign-out followed by refresh returned to “Sign in required.” Rotating the Labeller's access code invalidated the previously active session; the replacement code worked.
+- The data gate initially prevented task data exposure. When enabled in TEST, the labeller saw exactly two assigned tasks, while the other synthetic user's task remained hidden.
+- Admin initialized the five attendance/leave tabs in the private master spreadsheet.
+- Labeller clock-in created one `OPEN` session; clock-out changed it to `CLOSED`.
+- A tea break was recorded as `OPEN`, then `CLOSED` with an end request ID.
+- A full-day leave request was submitted and approved by Admin. The Labeller could view their own request without approval controls.
+- Invalid short-leave times (end earlier than start) were rejected; a valid short-leave interval was accepted.
+- The first live overlap check exposed a date-type bug and created an extra pending request. After the normalization fix, an overlapping request was rejected with the expected message. The extra regression request was rejected through the app with an audit note, and the sheet showed only the original approved row and that rejected test row; no row was added by the latest blocked attempt.
+
+### Still required in Google Apps Script TEST
+- Verify all deployment properties and restricted sign-in audience from the deployment screen; test inactive/duplicate users and direct API role-denial behavior.
+- Test half-day leave (AM/PM), past-date blocking, and confirm leave dates render as ISO date-only values after the latest bundle deployment.
+- Verify clock-out while a break is open is rejected; test duplicate/unmatched break actions, repeated request IDs, and concurrent attendance/leave actions against live Sheets.
+- Verify event-log completeness, previous-day open-session behavior, timezone edge cases, and partial-write recovery for multi-tab operations.
+- Approve `ATTENDANCE_MAX_SESSION_HOURS` before enabling stale-session closure; trigger installation belongs to Phase 3.
+- Finish remaining Phase 3–6 features and reliability/security tests. Keep using synthetic data only.
 
 ## Release decision
 
-**Do not merge or deploy to production yet.** The source and mocked checks pass, but Phase 0–2 are not live-runtime verified. Keep the TEST data gate closed until the browser-based authentication checks pass. Do not use real employee data until the TEST configuration and privacy checks are complete.
+**Do not merge or deploy to production yet.** Core Phase 0/1 and selected Phase 2 flows have been verified live using synthetic data; the 28/28 mock checks are separate and predate the date-normalization fix. Phase 2 edge-case tests and Phase 3–6 remain. Keep production blocked until critical access-control, concurrency, data-integrity, metric-definition, quota, backup/restore and pilot acceptance gates pass.
 
 
 ## Live TEST regression discovered on 2026-10-27
