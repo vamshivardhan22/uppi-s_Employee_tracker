@@ -42,5 +42,10 @@ function getMasterSpreadsheet_() {
 }
 
 function isIdentityGatePassed_() {
-  return PropertiesService.getScriptProperties().getProperty(APP.IDENTITY_GATE_PROPERTY) === 'true';
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(APP.IDENTITY_GATE_PROPERTY) !== 'true') return false;
+  const env = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
+  if (env === 'TEST') return true;
+  if (env === 'PROD' && props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true') return true;
+  return false;
 }
