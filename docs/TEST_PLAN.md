@@ -104,6 +104,22 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Verify local date handling across midnight and daylight-saving-free `Asia/Kolkata` assumptions.
 - [ ] Confirm no attendance/leave writes touch source project task spreadsheets.
 
+## I. Phase 3 — issue detection, TAT, reminders and scheduling
+
+- [ ] Copy the current `browser-deploy/Main.gs` and `browser-deploy/Index.html` into the TEST Apps Script project and deploy a new version. Confirm the existing Google-account audience and owner-execution settings remain unchanged.
+- [ ] Confirm the Phase 3 panel is visible to Admin only; the Labeller must not see scan, resolve, digest, or scheduling actions.
+- [ ] Admin initialization creates `Issue_Registry`, `Issue_Scan_Runs`, `TAT_Rules`, and `Issue_Reminder_Log` with exact headers, and rerunning initialization is idempotent.
+- [ ] Run a manual scan using synthetic rows. Verify missing Set ID, missing annotator/status, inactive/unknown annotator and hold findings as applicable.
+- [ ] Verify task-source sheets are not modified by issue scanning.
+- [ ] Configure a test TAT rule explicitly; verify warning, critical breach and missing-start behavior using known timestamps. No business threshold is inferred when rules are absent.
+- [ ] Verify identical findings reuse the stable issue key, repeated scans update an existing issue instead of duplicating it, and a fully scanned resolved finding becomes `RESOLVED`.
+- [ ] Simulate a project read error or row/time-budget truncation; the scan must report `PARTIAL`, preserve the next cursor, and must not automatically resolve issues belonging to incompletely scanned projects.
+- [ ] Verify run logs record start/end/duration, rows, project coverage, findings, errors, and complete/partial outcome.
+- [ ] Preview a digest; verify recipients and issue counts without sending email. Confirm `ISSUE_EMAILS_ENABLED` missing or `false` prevents sending.
+- [ ] Only after explicit approval, test a single digest with a synthetic recipient. Verify remaining quota, recipient cap, per-day duplicate prevention and `SENT`/`FAILED` log outcomes.
+- [ ] Confirm no schedule exists by default. Only enable a 6- or 12-hour trigger after a complete manual scan and explicit approval; verify disable removes the trigger and stops scheduled execution.
+- [ ] Confirm all recipient, TAT, row-limit and schedule decisions are recorded; keep scheduled email off until TEST acceptance.
+
 ## H. Release rule
 
 No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable checks pass and a reviewer verifies the exact metric definitions.
