@@ -215,6 +215,37 @@ function adminEmployeeSummary_(row, headers) {
   };
 }
 
+function adminDisableEmployeeCredential_(email) {
+  const sheet = authCredentialSheet_();
+  const raw = adminGetRawTable_(sheet, ['Email', 'Access Code Hash', 'Active', 'Updated At']);
+  const matches = [];
+  raw.rows.forEach((row,index) => {
+    if (normalizeEmail_(row[raw.indexes.Email]) === email) matches.push(index);
+  });
+  if (matches.length > 1) throw new Error('Duplicate credential rows exist for this employee. Resolve them before changing employee access.');
+  if (!matches.length) return false;
+  const index = matches[0];
+  const row = raw.rows[index].slice();
+  row[raw.indexes.Active] = false;
+  row[raw.indexes['Updated At']] = new Date();
+  sheet.getRange(index + 2, 1, 1, raw.headers.length).setValues([row]);
+  return true;
+}
+
+function adminDisableEmployeeAccess_(email) {
+  const sheet = getMasterSpreadsheet_().getSheetByName(APP.SHEETS.ACCESS);
+  const raw = adminGetRawTable_(sheet, ['Email', 'Project ID', 'Active']);
+  let revoked = 0;
+  raw.rows.forEach((row,index) => {
+    if (normalizeEmail_(row[raw.indexes.Email]) !== email || !isActiveValue_(row[raw.indexes.Active])) return;
+    const next = row.slice();
+    next[raw.indexes.Active] = false;
+    sheet.getRange(index + 2, 1, 1, raw.headers.length).setValues([next]);
+    revoked += 1;
+  });
+  return revoked;
+}
+
 function adminAssertAtLeastOneActiveAdmin_(raw, newRow, targetIndex) {
   let activeAdmins = 0;
   raw.rows.forEach((row, index) => {
@@ -272,8 +303,14 @@ function saveEmployeeAdmin(authToken, payload) {
     } else {
       sheet.appendRow(newRow);
     }
+    const mustReissueAccessCode = Boolean(before && (before.active !== active || before.role !== role));
+    if (mustReissueAccessCode) adminDisableEmployeeCredential_(email);
+    const revokedProjectAccessGrants = Boolean(before && before.active && !active)
+      ? adminDisableEmployeeAccess_(email) : 0;
     const after = { email: email, displayName: displayName, role: role, active: active,
-      accessCodeProvisioning: matches.length ? 'existing-code-preserved' : 'issue-access-code-privately-in-Apps-Script-editor' };
+      accessCodeProvisioning: targetIndex < 0 ? 'issue-access-code-privately-in-Apps-Script-editor'
+        : (mustReissueAccessCode ? 'previous-code-and-sessions-revoked; issue-a-new-code' : 'existing-code-preserved'),
+      revokedProjectAccessGrants: revokedProjectAccessGrants };
     adminWriteAudit_(actor, targetIndex >= 0 ? 'EMPLOYEE_UPDATED' : 'EMPLOYEE_CREATED', 'EMPLOYEE', email, before, after);
     return {
       ok: true, message: targetIndex >= 0 ? 'Employee updated.' : 'Employee created. Generate and deliver an access code privately before the employee signs in.',
