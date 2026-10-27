@@ -120,6 +120,49 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Confirm no schedule exists by default. Only enable a 6- or 12-hour trigger after a complete manual scan and explicit approval; verify disable removes the trigger and stops scheduled execution.
 - [ ] Confirm all recipient, TAT, row-limit and schedule decisions are recorded; keep scheduled email off until TEST acceptance.
 
+## J. Phase 4 — admin management, reports and snapshots
+
+- [ ] Copy and deploy the latest TEST bundle before exercising Phase 4 UI; confirm only Admin sees the admin console.
+- [ ] Initialize admin storage; verify Admin_Audit_Log, Team_Snapshots and Backup_Log headers; rerun initialization and confirm it is idempotent and does not overwrite unexpected headers.
+- [ ] Verify every admin API rejects unauthenticated users and Labeller-role sessions, regardless of which UI elements are hidden.
+- [ ] Create/update synthetic employees; reject malformed email, invalid role, duplicate normalized email, duplicate records and blank display name.
+- [ ] Confirm an Admin cannot demote/deactivate themselves or remove the last active Admin.
+- [ ] Confirm deactivating a user disables their project grants and credentials, and old sessions cannot access data. Verify the new user receives no access code from the UI; issue codes only through the editor-only provisioning helper.
+- [ ] Add/update/disable a synthetic project; verify invalid IDs/timezones are rejected and source task sheets are never edited.
+- [ ] Grant and revoke a project-access row. Confirm the Labeller sees rows only while both the project and grant are active.
+- [ ] Add/update canonical mappings; enforce Dataset Set Id, Annotator Mail and Status as required; duplicate/missing mappings fail closed.
+- [ ] Hand-calculate team report totals from synthetic rows for Assigned Date and Submitted Date filters, statuses, employees, projects and distinct sets.
+- [ ] Force a source error and a per-project report row limit; verify partial-data warnings/errors appear and the report must not be treated as complete.
+- [ ] Save a snapshot only from a complete report, then confirm the snapshot contains the summary and aggregate rows in the private master. Partial reports and oversized snapshots must be refused.
+- [ ] Verify rendered table/chart text is escaped, mobile layout remains usable, and snapshots are admin-only.
+
+## K. Phase 5 — operational health, security, reliability and backup
+
+- [ ] Run operational health and confirm it is read-only; check environment, gate, tab metadata, active counts and installed trigger metadata.
+- [ ] Run configuration audit against clean synthetic config and against intentionally broken config (duplicate email/project IDs, dangling access, missing mappings, bad sources, missing credentials and incorrect environment/master properties). Blockers must be clear and a blocked audit must not promote release.
+- [ ] Verify the release checklist labels itself TEST-only and does not imply production approval.
+- [ ] Test all admin/attendance/issue APIs using missing, invalid, expired, inactive-user, Labeller-role and rotated-credential sessions.
+- [ ] Exercise simultaneous clock-in, break and leave submissions, duplicate request IDs, replay with mismatched payload, issue scan leases, simultaneous admin updates, and retry after simulated service failure.
+- [ ] Test partial multi-tab writes and recovery. Google Sheets writes are not transactional; document exactly what persisted and do not blindly replay an uncertain write.
+- [ ] Measure realistic source row counts, execution duration, Sheets service calls, Cache behavior, Apps Script quotas and report/scan row caps. Do not enable a trigger cadence until measured cost fits the account quota.
+- [ ] Keep scheduled scans and outgoing mail disabled. If separately approved for a TEST drill, use a synthetic recipient, verify one-per-day deduplication and recipient caps, and then disable email/trigger again.
+- [ ] Confirm TEST_BACKUP_ENABLED is false by default; enable it only for an approved backup drill in an explicitly labelled TEST environment.
+- [ ] Create a TEST backup and verify Drive privacy and required tabs. Treat the backup as containing employee records and access-code hashes; never share it with labellers.
+- [ ] Perform a separate restore drill using a copy of the backup and a separate TEST Apps Script project/master. Verify sign-in, sample task read, attendance/leave records, issue registry and app-owned data; never overwrite the active master in place.
+- [ ] Record every failure, recovery action, resulting row count and audit entry. Passing the audit tool alone is not a substitute for these tests.
+
+## L. Phase 6 — environment separation and staged rollout
+
+- [ ] TEST project uses APP_ENV_LABEL=TEST, MASTER_SPREADSHEET_ID=TEST_MASTER_SPREADSHEET_ID, and IDENTITY_GATE_PASSED remains false during auth tests.
+- [ ] TEST project has no PROD_MASTER_SPREADSHEET_ID; email and scheduled-scan properties remain off unless an approved isolated test is underway.
+- [ ] Change the expected TEST master ID in a controlled test and confirm app data remains locked on mismatch; restore the correct ID and verify recovery.
+- [ ] Create a distinct PROD Apps Script project and private PROD master only after approval. Never repoint the existing TEST app to the PROD master.
+- [ ] Production configuration uses APP_ENV_LABEL=PROD and a matching PROD_MASTER_SPREADSHEET_ID; production approval stays off until signed human review.
+- [ ] Verify deployment executes as the intended owner and requires sign-in with a Google account; anonymous/public access is prohibited.
+- [ ] Create a release evidence packet: configuration audit, all phase test results, metric definitions, backup/restore evidence, quota observations, reviewer approval and rollback plan.
+- [ ] Run a small synthetic/internal pilot first. Expand access only after the owner confirms metrics, data access boundaries, escalation policy and rollback are correct.
+- [ ] Record explicit go/no-go decision. The repository's release checklist never authorizes deployment automatically.
+
 ## H. Release rule
 
-No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable checks pass and a reviewer verifies the exact metric definitions.
+No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable Phase 0–6 checks pass, a separate-environment review is complete, and a human reviewer verifies metric and attendance policy definitions.
