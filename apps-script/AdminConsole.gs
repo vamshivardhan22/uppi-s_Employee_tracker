@@ -15,6 +15,10 @@ const ADMIN_CONSOLE = Object.freeze({
     Team_Snapshots: [
       'Snapshot ID', 'Captured At', 'Window Start', 'Window End',
       'Date Field', 'Created By', 'Payload JSON'
+    ],
+    Backup_Log: [
+      'Backup ID', 'Created At', 'Created By', 'Environment', 'Source Master ID',
+      'Backup Spreadsheet ID', 'Backup URL', 'Status', 'Details'
     ]
   }),
   MAX_SNAPSHOT_JSON: 40000
