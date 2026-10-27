@@ -103,11 +103,11 @@ A harness with in-memory Sheets, Script Properties, LockService and Utilities ra
 - Verify clock-out while a break is open is rejected; test duplicate/unmatched break actions, repeated request IDs, and concurrent attendance/leave actions against live Sheets.
 - Verify event-log completeness, previous-day open-session behavior, timezone edge cases, and partial-write recovery for multi-tab operations.
 - Approve `ATTENDANCE_MAX_SESSION_HOURS` before enabling stale-session closure; trigger installation belongs to Phase 3.
-- Finish remaining Phase 3–6 features and reliability/security tests. Keep using synthetic data only.
+- Deploy and verify the Phase 3 source in live TEST; complete the remaining Phase 4–6 features and reliability/security tests. Keep using synthetic data only.
 
 ## Release decision
 
-**Do not merge or deploy to production yet.** Core Phase 0/1 and selected Phase 2 flows have been verified live using synthetic data; the 28/28 mock checks are separate and predate the date-normalization fix. Phase 2 edge-case tests and Phase 3–6 remain. Keep production blocked until critical access-control, concurrency, data-integrity, metric-definition, quota, backup/restore and pilot acceptance gates pass.
+**Do not merge or deploy to production yet.** Core Phase 0/1 and selected Phase 2 flows have been verified live using synthetic data; the 28/28 mock checks are separate and predate the date-normalization fix. Phase 2 edge-case tests and live Phase 3 verification remain, while Phase 4–6 features are still to be implemented. Keep production blocked until critical access-control, concurrency, data-integrity, metric-definition, quota, backup/restore and pilot acceptance gates pass.
 
 
 ## Live TEST date-normalization regression — fixed and re-tested on 2026-10-27
