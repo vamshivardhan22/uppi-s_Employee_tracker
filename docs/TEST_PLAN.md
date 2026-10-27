@@ -163,6 +163,6 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 - [ ] Run a small synthetic/internal pilot first. Expand access only after the owner confirms metrics, data access boundaries, escalation policy and rollback are correct.
 - [ ] Record explicit go/no-go decision. The repository's release checklist never authorizes deployment automatically.
 
-## H. Release rule
+## M. Release rule
 
 No real employee data, scheduled triggers, outgoing reminder emails or production deployment until applicable Phase 0–6 checks pass, a separate-environment review is complete, and a human reviewer verifies metric and attendance policy definitions.
