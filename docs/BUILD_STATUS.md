@@ -30,7 +30,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
 - Admin approve/reject actions for leave requests; labellers can only list their own requests.
 - Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
-- In-memory mocked verification: combined Apps Script syntax and dashboard inline JavaScript syntax passed; 28 access-code, session, task-isolation, attendance and leave behavior checks passed against the current modular source. See `docs/VERIFICATION_LOG.md` for exact coverage and limitations.
+- In-memory mocked verification: a previous revision passed combined Apps Script/inline JavaScript syntax checks and 28 access-code, session, task-isolation, attendance and leave behavior checks. Those results predate the live date-normalization regression fix; the corrected revision's complete mock/parser suite must be rerun. See `docs/VERIFICATION_LOG.md`.
 - Browser-only deployment bundle maintained under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML have been checked against modular sources at the matching revision.
 - `docs/BROWSER_ONLY_SETUP.md` describes browser-only setup. Live TEST now exists; remaining runtime edge checks are tracked in `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md`.
 
@@ -42,7 +42,7 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Scheduled scanner, email digests, quota-aware mail handling or heartbeat monitoring.
 - Admin People/Projects management or grant/revoke flows.
 - My Reports, attendance history, charts, snapshots or performance/load tests.
-- Browser-based access-code tests, real Apps Script/Sheets runtime tests, production deployment or pilot.
+- Remaining browser-based edge tests, production deployment or pilot. Core login, task-isolation and selected Phase 2 workflows have been tested live in the dedicated TEST deployment.
 
 ## Known limitations and release blockers
 
