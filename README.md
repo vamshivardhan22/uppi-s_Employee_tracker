@@ -4,11 +4,11 @@ A Google Apps Script + Google Sheets dashboard for labelling teams. The agreed d
 
 ## Build status
 
-The repository contains the Phase 0/1 starter and Phase 2 attendance/leave implementation. It is **not a completed or production-verified application**.
+The repository contains Phase 0/1 and Phase 2 implementation with selected live TEST checks completed. It is **not a completed or production-verified application**.
 
-- **Phase 0:** verify app-level access-code authentication for personal Gmail users while the data gate is closed.
-- **Phase 1:** deliver the authenticated, read-only My Work dashboard.
-- **Phase 2:** attendance, leave, login/logout and break tracking (code added; TEST runtime verification is still pending).
+- **Phase 0:** access-code sign-in, invalid-code rejection, sign-out and session revocation verified in TEST; remaining identity/role edge cases still need checks.
+- **Phase 1:** read-only My Work dashboard verified with synthetic data; the Labeller sees only their assigned rows.
+- **Phase 2:** clock-in/out, break start/end, full-day leave submission, admin approval, labeller leave visibility, short-leave validation and overlap protection verified in TEST; edge-case and reliability checks remain.
 - **Phase 3:** issue scanning, turnaround-time checks, reminders and quota-aware scheduled processing.
 - **Phase 4:** admin People/Projects management, team dashboard, reports, charts and snapshots.
 - **Phase 5:** privacy, concurrency, edge-case, load, quota, backup and restore verification.
