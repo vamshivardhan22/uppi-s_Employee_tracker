@@ -5,9 +5,9 @@ This log records checks run against code read back from the GitHub development b
 ## Current source under test
 
 - Branch: `build/phase-0-1-dashboard`
-- Browser bundle `browser-deploy/Main.gs` SHA: `6be6580a78622abeb3cb47273a45390897c2b97a`
+- Browser bundle `browser-deploy/Main.gs` SHA: `3b786268167df18097a2381da2b089ca4d77ff25`
 - Modular `apps-script/Auth.gs` SHA: `f68809bfa20ab54d4d9eb0589be8194e57617043`
-- Modular `apps-script/Attendance.gs` SHA: `f01ad7c4ea103aa082a0abb33553e3008df719cf`
+- Modular `apps-script/Attendance.gs` SHA: `237a5e52fb1d6adfe2ba9dd87e4b666ef74715f4`
 - Modular `apps-script/Code.gs` SHA: `6b30e23c1887420af3b9a393247e4de46a5657e7`
 - Modular `apps-script/UserApi.gs` SHA: `a3d38e14df704d37db0df1384392f0b6693b8584`
 - UI `apps-script/Index.html` SHA: `8fbc179f9030937b2c7b71dbe2ad5c872ac5f8d8`
