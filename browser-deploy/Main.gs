@@ -43,7 +43,17 @@ function getMasterSpreadsheet_() {
 }
 
 function isIdentityGatePassed_() {
-  return PropertiesService.getScriptProperties().getProperty(APP.IDENTITY_GATE_PROPERTY) === 'true';
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty(APP.IDENTITY_GATE_PROPERTY) !== 'true') return false;
+  const env = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
+  const currentMasterId = String(props.getProperty(APP.MASTER_ID_PROPERTY) || '').trim();
+  const expectedMasterProperty = env === 'TEST' ? 'TEST_MASTER_SPREADSHEET_ID'
+    : (env === 'PROD' ? 'PROD_MASTER_SPREADSHEET_ID' : '');
+  if (!expectedMasterProperty) return false;
+  const expectedMasterId = String(props.getProperty(expectedMasterProperty) || '').trim();
+  if (!currentMasterId || !expectedMasterId || currentMasterId !== expectedMasterId) return false;
+  if (env === 'TEST') return true;
+  return env === 'PROD' && props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true';
 }
 
 // ===== SOURCE: apps-script/Auth.gs =====
@@ -1747,6 +1757,16 @@ function adminWriteAudit_(actor, action, entityType, entityKey, beforeValue, aft
   ]);
 }
 
+function adminWriteAuditSafely_(actor, action, entityType, entityKey, beforeValue, afterValue) {
+  try {
+    adminWriteAudit_(actor, action, entityType, entityKey, beforeValue, afterValue);
+    return '';
+  } catch (error) {
+    try { Logger.log('Admin audit write failed after action %s: %s', action, String(error && error.message ? error.message : error)); } catch (logError) {}
+    return ' WARNING: the change may have saved, but its audit row could not be written. Check the record and Admin_Audit_Log before retrying.';
+  }
+}
+
 function adminReadRows_(sheet, requiredHeaders) {
   const table = readTable_(sheet);
   const map = headerMap_(table.headers);
@@ -1863,6 +1883,37 @@ function adminEmployeeSummary_(row, headers) {
   };
 }
 
+function adminDisableEmployeeCredential_(email) {
+  const sheet = authCredentialSheet_();
+  const raw = adminGetRawTable_(sheet, ['Email', 'Access Code Hash', 'Active', 'Updated At']);
+  const matches = [];
+  raw.rows.forEach((row,index) => {
+    if (normalizeEmail_(row[raw.indexes.Email]) === email) matches.push(index);
+  });
+  if (matches.length > 1) throw new Error('Duplicate credential rows exist for this employee. Resolve them before changing employee access.');
+  if (!matches.length) return false;
+  const index = matches[0];
+  const row = raw.rows[index].slice();
+  row[raw.indexes.Active] = false;
+  row[raw.indexes['Updated At']] = new Date();
+  sheet.getRange(index + 2, 1, 1, raw.headers.length).setValues([row]);
+  return true;
+}
+
+function adminDisableEmployeeAccess_(email) {
+  const sheet = getMasterSpreadsheet_().getSheetByName(APP.SHEETS.ACCESS);
+  const raw = adminGetRawTable_(sheet, ['Email', 'Project ID', 'Active']);
+  let revoked = 0;
+  raw.rows.forEach((row,index) => {
+    if (normalizeEmail_(row[raw.indexes.Email]) !== email || !isActiveValue_(row[raw.indexes.Active])) return;
+    const next = row.slice();
+    next[raw.indexes.Active] = false;
+    sheet.getRange(index + 2, 1, 1, raw.headers.length).setValues([next]);
+    revoked += 1;
+  });
+  return revoked;
+}
+
 function adminAssertAtLeastOneActiveAdmin_(raw, newRow, targetIndex) {
   let activeAdmins = 0;
   raw.rows.forEach((row, index) => {
@@ -1920,12 +1971,18 @@ function saveEmployeeAdmin(authToken, payload) {
     } else {
       sheet.appendRow(newRow);
     }
+    const mustReissueAccessCode = Boolean(before && (before.active !== active || before.role !== role));
+    if (mustReissueAccessCode) adminDisableEmployeeCredential_(email);
+    const revokedProjectAccessGrants = Boolean(before && before.active && !active)
+      ? adminDisableEmployeeAccess_(email) : 0;
     const after = { email: email, displayName: displayName, role: role, active: active,
-      accessCodeProvisioning: matches.length ? 'existing-code-preserved' : 'issue-access-code-privately-in-Apps-Script-editor' };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'EMPLOYEE_UPDATED' : 'EMPLOYEE_CREATED', 'EMPLOYEE', email, before, after);
+      accessCodeProvisioning: targetIndex < 0 ? 'issue-access-code-privately-in-Apps-Script-editor'
+        : (mustReissueAccessCode ? 'previous-code-and-sessions-revoked; issue-a-new-code' : 'existing-code-preserved'),
+      revokedProjectAccessGrants: revokedProjectAccessGrants };
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'EMPLOYEE_UPDATED' : 'EMPLOYEE_CREATED', 'EMPLOYEE', email, before, after);
     return {
-      ok: true, message: targetIndex >= 0 ? 'Employee updated.' : 'Employee created. Generate and deliver an access code privately before the employee signs in.',
-      employee: after
+      ok: true, message: (targetIndex >= 0 ? 'Employee updated.' : 'Employee created. Generate and deliver an access code privately before the employee signs in.') + auditWarning,
+      auditWarning: auditWarning, employee: after
     };
   });
 }
@@ -1976,8 +2033,8 @@ function saveProjectAdmin(authToken, payload) {
     else sheet.appendRow(row);
     const after = { projectId: projectId, projectName: projectName, spreadsheetId: spreadsheetId,
       tabName: tabName, timeZone: timeZone, active: active };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'PROJECT_UPDATED' : 'PROJECT_CREATED', 'PROJECT', projectId, before, after);
-    return { ok: true, message: targetIndex >= 0 ? 'Project updated.' : 'Project created.', project: after };
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'PROJECT_UPDATED' : 'PROJECT_CREATED', 'PROJECT', projectId, before, after);
+    return { ok: true, message: (targetIndex >= 0 ? 'Project updated.' : 'Project created.') + auditWarning, auditWarning: auditWarning, project: after };
   });
 }
 
@@ -2020,9 +2077,9 @@ function setProjectAccessAdmin(authToken, emailValue, projectIdValue, activeValu
       sheet.appendRow(row);
     }
     const after = { email: email, projectId: projectId, active: active };
-    adminWriteAudit_(actor, active ? 'PROJECT_ACCESS_GRANTED' : 'PROJECT_ACCESS_REVOKED',
+    const auditWarning = adminWriteAuditSafely_(actor, active ? 'PROJECT_ACCESS_GRANTED' : 'PROJECT_ACCESS_REVOKED',
       'PROJECT_ACCESS', email + '|' + projectId, before, after);
-    return { ok: true, message: active ? 'Project access granted.' : 'Project access revoked.' };
+    return { ok: true, message: (active ? 'Project access granted.' : 'Project access revoked.') + auditWarning, auditWarning: auditWarning };
   });
 }
 
@@ -2065,9 +2122,9 @@ function saveProjectMappingAdmin(authToken, payload) {
     if (targetIndex >= 0) sheet.getRange(targetIndex + 2, 1, 1, raw.headers.length).setValues([row]);
     else sheet.appendRow(row);
     const after = { projectId: projectId, canonicalField: canonicalField, sheetHeader: sheetHeader, required: required };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'PROJECT_MAPPING_UPDATED' : 'PROJECT_MAPPING_CREATED',
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'PROJECT_MAPPING_UPDATED' : 'PROJECT_MAPPING_CREATED',
       'COLUMN_MAPPING', projectId + '|' + canonicalField, before, after);
-    return { ok: true, message: targetIndex >= 0 ? 'Column mapping updated.' : 'Column mapping created.', mapping: after };
+    return { ok: true, message: (targetIndex >= 0 ? 'Column mapping updated.' : 'Column mapping created.') + auditWarning, auditWarning: auditWarning, mapping: after };
   });
 }
 
@@ -2092,6 +2149,13 @@ function adminValidateOptionalDate_(value, label) {
   return text;
 }
 
+function adminNumberProperty_(name, defaultValue, minValue, maxValue) {
+  const raw = PropertiesService.getScriptProperties().getProperty(name);
+  const value = Number(raw);
+  if (raw === null || raw === '' || !isFinite(value) || value < minValue || value > maxValue) return defaultValue;
+  return Math.floor(value);
+}
+
 function adminBuildTeamReport_(filters) {
   const opts = filters && typeof filters === 'object' ? filters : {};
   const fromDate = adminValidateOptionalDate_(opts.fromDate, 'Start date');
@@ -2103,6 +2167,7 @@ function adminBuildTeamReport_(filters) {
   const employees = adminEmployeeObjects_();
   const employeeByEmail = new Map(employees.map(item => [item.email, item]));
   const projects = adminProjectObjects_().filter(item => item.active);
+  const reportRowLimit = adminNumberProperty_('ADMIN_REPORT_MAX_ROWS', 25000, 1000, 50000);
   const byEmployee = new Map();
   const byProject = new Map();
   const byStatus = new Map();
@@ -2116,72 +2181,97 @@ function adminBuildTeamReport_(filters) {
 
   projects.forEach(project => {
     try {
-      const source = readProjectTable_(project);
+      const sourceSpreadsheet = SpreadsheetApp.openById(project.spreadsheetId);
+      const sourceSheet = sourceSpreadsheet.getSheetByName(project.tabName);
+      if (!sourceSheet) throw new Error('Configured source tab "' + project.tabName + '" was not found.');
+      const lastRow = sourceSheet.getLastRow();
+      const lastColumn = sourceSheet.getLastColumn();
+      if (lastRow < 1 || lastColumn < 1) throw new Error('Source tab has no header row.');
+      const headers = sourceSheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0]
+        .map(value => String(value == null ? '' : value).trim());
+      const nonBlankHeaders = headers.filter(Boolean).map(value => value.toLowerCase());
+      if (new Set(nonBlankHeaders).size !== nonBlankHeaders.length) {
+        throw new Error('Duplicate source header names were found.');
+      }
       const mapping = getColumnMappings_(project.projectId);
-      const setIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.SET_ID] || '');
-      const emailIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.ANNOTATOR_EMAIL] || '');
-      const statusIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.STATUS] || '');
+      const setIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.SET_ID] || '');
+      const emailIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.ANNOTATOR_EMAIL] || '');
+      const statusIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.STATUS] || '');
       if ([setIndex, emailIndex, statusIndex].some(index => index < 0)) {
         throw new Error('Required task fields are not fully mapped to source headers.');
       }
-      const dateIndex = findHeaderIndex_(source.headers, mapping[dateField] || '');
+      const dateIndex = findHeaderIndex_(headers, mapping[dateField] || '');
       if ((fromDate || toDate) && dateIndex < 0) {
         throw new Error('Date-filter field "' + dateField + '" is not mapped or its source header is missing.');
       }
+      const assignedIndex = findHeaderIndex_(headers, mapping[APP.FIELDS.ASSIGNED_DATE] || '');
       const projectTotals = byProject.get(project.projectId) || {
         projectId: project.projectId, projectName: project.projectName,
         tasks: 0, completed: 0, sets: new Set()
       };
-      source.rows.forEach(row => {
-        const taskDate = dateIndex >= 0 ? adminDateOnly_(row[dateIndex], project.timeZone) : '';
-        if (fromDate || toDate) {
-          if (!taskDate || (fromDate && taskDate < fromDate) || (toDate && taskDate > toDate)) return;
-        }
-        const email = normalizeEmail_(row[emailIndex]);
-        const setId = safeText_(row[setIndex]);
-        const status = safeText_(row[statusIndex]) || '(blank)';
-        const statusLower = status.toLowerCase();
-        const completed = APP.COMPLETED_STATUSES.includes(statusLower);
-        totalTasks += 1;
-        if (completed) completedTasks += 1;
-        if (setId) {
-          rowsWithSetId += 1;
-          distinctSets.add(project.projectId + '|' + setId.toLowerCase());
-          projectTotals.sets.add(setId.toLowerCase());
-        }
-        if (email) rowsWithEmail += 1;
-        projectTotals.tasks += 1;
-        if (completed) projectTotals.completed += 1;
+      const availableRows = Math.max(0, lastRow - 1);
+      const rowsToRead = Math.min(availableRows, reportRowLimit);
+      for (let offset = 0; offset < rowsToRead; offset += 500) {
+        const count = Math.min(500, rowsToRead - offset);
+        const rows = sourceSheet.getRange(offset + 2, 1, count, lastColumn).getValues();
+        rows.forEach(row => {
+          if (!row.some(value => value !== '' && value !== null)) return;
+          const taskDate = dateIndex >= 0 ? adminDateOnly_(row[dateIndex], project.timeZone) : '';
+          if (fromDate || toDate) {
+            if (!taskDate || (fromDate && taskDate < fromDate) || (toDate && taskDate > toDate)) return;
+          }
+          const email = normalizeEmail_(row[emailIndex]);
+          const setId = safeText_(row[setIndex]);
+          const status = safeText_(row[statusIndex]) || '(blank)';
+          const statusLower = status.toLowerCase();
+          const completed = APP.COMPLETED_STATUSES.includes(statusLower);
+          totalTasks += 1;
+          if (completed) completedTasks += 1;
+          if (setId) {
+            rowsWithSetId += 1;
+            distinctSets.add(project.projectId + '|' + setId.toLowerCase());
+            projectTotals.sets.add(setId.toLowerCase());
+          }
+          if (email) rowsWithEmail += 1;
+          projectTotals.tasks += 1;
+          if (completed) projectTotals.completed += 1;
 
-        const priorStatus = byStatus.get(status) || { status: status, tasks: 0, completed: 0 };
-        priorStatus.tasks += 1;
-        if (completed) priorStatus.completed += 1;
-        byStatus.set(status, priorStatus);
+          const priorStatus = byStatus.get(status) || { status: status, tasks: 0, completed: 0 };
+          priorStatus.tasks += 1;
+          if (completed) priorStatus.completed += 1;
+          byStatus.set(status, priorStatus);
 
-        if (email) {
-          const employee = employeeByEmail.get(email);
-          const name = employee ? employee.displayName : email;
-          const person = byEmployee.get(email) || {
-            email: email, displayName: name, role: employee ? employee.role : 'unknown',
-            tasks: 0, completed: 0, open: 0, sets: new Set()
-          };
-          person.tasks += 1;
-          if (completed) person.completed += 1;
-          else person.open += 1;
-          if (setId) person.sets.add(project.projectId + '|' + setId.toLowerCase());
-          byEmployee.set(email, person);
-        }
+          if (email) {
+            const employee = employeeByEmail.get(email);
+            const name = employee ? employee.displayName : email;
+            const person = byEmployee.get(email) || {
+              email: email, displayName: name, role: employee ? employee.role : 'unknown',
+              tasks: 0, completed: 0, open: 0, sets: new Set()
+            };
+            person.tasks += 1;
+            if (completed) person.completed += 1;
+            else person.open += 1;
+            if (setId) person.sets.add(project.projectId + '|' + setId.toLowerCase());
+            byEmployee.set(email, person);
+          }
 
-        const assignedIndex = findHeaderIndex_(source.headers, mapping[APP.FIELDS.ASSIGNED_DATE] || '');
-        const assignedDate = assignedIndex >= 0 ? adminDateOnly_(row[assignedIndex], project.timeZone) : '';
-        if (assignedDate) {
-          const point = trend.get(assignedDate) || { date: assignedDate, tasks: 0, completed: 0 };
-          point.tasks += 1;
-          if (completed) point.completed += 1;
-          trend.set(assignedDate, point);
-        }
-      });
+          const assignedDate = assignedIndex >= 0 ? adminDateOnly_(row[assignedIndex], project.timeZone) : '';
+          if (assignedDate) {
+            const point = trend.get(assignedDate) || { date: assignedDate, tasks: 0, completed: 0 };
+            point.tasks += 1;
+            if (completed) point.completed += 1;
+            trend.set(assignedDate, point);
+          }
+        });
+      }
       byProject.set(project.projectId, projectTotals);
+      if (availableRows > reportRowLimit) {
+        projectErrors.push({
+          projectId: project.projectId, projectName: project.projectName,
+          message: 'Report safety limit reached: processed ' + reportRowLimit + ' of ' + availableRows +
+            ' source rows. Narrow the date range or increase ADMIN_REPORT_MAX_ROWS after load testing.'
+        });
+      }
     } catch (error) {
       projectErrors.push({
         projectId: project.projectId, projectName: project.projectName,
@@ -2307,11 +2397,11 @@ function createTeamSnapshot(authToken, filters) {
       snapshotId, now, report.filters.fromDate, report.filters.toDate,
       report.filters.dateField, actor.email, json
     ]);
-    adminWriteAudit_(actor, 'TEAM_SNAPSHOT_CREATED', 'SNAPSHOT', snapshotId, null, {
+    const auditWarning = adminWriteAuditSafely_(actor, 'TEAM_SNAPSHOT_CREATED', 'SNAPSHOT', snapshotId, null, {
       fromDate: report.filters.fromDate, toDate: report.filters.toDate,
       dateField: report.filters.dateField, bytes: json.length
     });
-    return { ok: true, snapshotId: snapshotId, message: 'Team report snapshot saved.' };
+    return { ok: true, snapshotId: snapshotId, auditWarning: auditWarning, message: 'Team report snapshot saved.' + auditWarning };
   });
 }
 
@@ -2341,29 +2431,43 @@ function getReleaseReadiness(authToken) {
   const configuredEnv = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
   const env = configuredEnv || 'UNSET';
   const masterId = getMasterSpreadsheetId_();
+  const expectedMasterProperty = env === 'TEST' ? 'TEST_MASTER_SPREADSHEET_ID'
+    : (env === 'PROD' ? 'PROD_MASTER_SPREADSHEET_ID' : '');
+  const expectedMasterId = expectedMasterProperty
+    ? String(props.getProperty(expectedMasterProperty) || '').trim() : '';
+  const currentMasterMatchesExpected = Boolean(masterId && expectedMasterId && masterId === expectedMasterId);
   const productionId = String(props.getProperty('PROD_MASTER_SPREADSHEET_ID') || '').trim();
   const gate = isIdentityGatePassed_();
+  const emailEnabled = props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true';
+  const scheduleEnabled = props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true';
+  const productionApproved = props.getProperty('PRODUCTION_RELEASE_APPROVED') === 'true';
   const issues = [];
   if (!['TEST', 'PROD'].includes(env)) issues.push('APP_ENV_LABEL must be TEST or PROD.');
   if (env !== 'TEST') issues.push('Current project is not explicitly labeled TEST. Stop until environment is reviewed.');
-  if (!gate) issues.push('IDENTITY_GATE_PASSED is false; app data is locked.');
-  if (productionId && productionId === masterId) issues.push('TEST master ID equals PROD_MASTER_SPREADSHEET_ID; environment separation failed.');
-  if (props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true') issues.push('Issue email reminders are enabled; verify consent, recipient behavior and quota before release.');
-  if (props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true') issues.push('Scheduled issue scanning is enabled in this project.');
+  if (!expectedMasterId || !currentMasterMatchesExpected) issues.push('MASTER_SPREADSHEET_ID must match the environment-specific expected master ID property.');
+  if (!gate) issues.push('Data gate is locked because the gate, environment label, expected master ID or production approval is missing/mismatched.');
+  if (env === 'TEST' && productionId) issues.push('Do not store PROD_MASTER_SPREADSHEET_ID inside the TEST project. Configure production in a separate Apps Script project.');
+  if (env === 'PROD' && !productionApproved) issues.push('Production release approval is not enabled.');
+  if (emailEnabled) issues.push('Issue email reminders are enabled; verify consent, recipient behavior and quota before release.');
+  if (scheduleEnabled) issues.push('Scheduled issue scanning is enabled in this project.');
   return {
     ok: true,
     environment: env || 'UNSET',
     currentMasterConfigured: Boolean(masterId),
+    currentMasterMatchesExpected: currentMasterMatchesExpected,
+    expectedMasterProperty: expectedMasterProperty,
     dataGatePassed: gate,
-    emailEnabled: props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true',
-    scheduleEnabled: props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true',
+    emailEnabled: emailEnabled,
+    scheduleEnabled: scheduleEnabled,
     productionMasterConfigured: Boolean(productionId),
+    productionApproved: productionApproved,
     checks: [
       { key: 'environment', passed: env === 'TEST', label: 'Explicitly labeled TEST' },
       { key: 'gate', passed: gate, label: 'TEST data gate enabled' },
-      { key: 'master_separation', passed: !productionId || productionId !== masterId, label: 'TEST and PROD master IDs differ' },
-      { key: 'email_off', passed: props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) !== 'true', label: 'Email reminders off by default' },
-      { key: 'schedule_off', passed: props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) !== 'true', label: 'Scheduled scans off by default' }
+      { key: 'master_binding', passed: currentMasterMatchesExpected, label: 'Current master matches environment-specific master ID' },
+      { key: 'prod_property', passed: env !== 'TEST' || !productionId, label: 'PROD master is not configured inside TEST project' },
+      { key: 'email_off', passed: !emailEnabled, label: 'Email reminders off by default' },
+      { key: 'schedule_off', passed: !scheduleEnabled, label: 'Scheduled scans off by default' }
     ],
     warnings: issues,
     message: 'This is a configuration readiness view, not approval to deploy to production. A human release review is still required.'
@@ -2855,337 +2959,8 @@ function closeStaleAttendanceSessions_() {
 }
 
 // ===== SOURCE: apps-script/OperationsHealth.gs =====
-/**
- * Phase 5 operational health, integrity audit and pre-release checks.
- * Audits are read-only against task sources and write only to the private master.
- */
-function getOperationalHealth(authToken) {
-  const actor = requireAdmin_(authToken);
-  const props = PropertiesService.getScriptProperties();
-  const master = getMasterSpreadsheet_();
-  const managedTabs = [
-    APP.SHEETS.EMPLOYEES, APP.SHEETS.PROJECTS, APP.SHEETS.ACCESS,
-    APP.SHEETS.COLUMN_MAP, AUTH.CREDENTIAL_SHEET
-  ].concat(Object.keys(ATTENDANCE.HEADERS), Object.keys(ISSUE_SCAN.HEADERS),
-    Object.keys(ADMIN_CONSOLE.HEADERS));
-  const sheets = managedTabs.map(name => {
-    const sheet = master.getSheetByName(name);
-    return {
-      name: name,
-      exists: Boolean(sheet),
-      dataRows: sheet ? Math.max(0, sheet.getLastRow() - 1) : 0,
-      columns: sheet ? sheet.getLastColumn() : 0
-    };
-  });
-  const employees = adminEmployeeObjects_();
-  const projects = adminProjectObjects_();
-  const triggers = ScriptApp.getProjectTriggers().map(trigger => ({
-    handler: trigger.getHandlerFunction(),
-    eventType: String(trigger.getEventType ? trigger.getEventType() : '')
-  }));
-  return {
-    ok: true,
-    environment: String(props.getProperty('APP_ENV_LABEL') || 'UNSET').trim().toUpperCase(),
-    timeZone: APP.TIME_ZONE,
-    dataGatePassed: isIdentityGatePassed_(),
-    activeEmployees: employees.filter(item => item.active).length,
-    activeAdmins: employees.filter(item => item.active && item.role === 'admin').length,
-    activeProjects: projects.filter(item => item.active).length,
-    issueEmailEnabled: props.getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true',
-    issueScheduleEnabled: props.getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true',
-    triggerHandlers: triggers,
-    sheets: sheets,
-    message: 'Health overview is read-only. Row counts are metadata, not a completeness guarantee.'
-  };
-}
-
-function adminCheckProjectSource_(project) {
-  try {
-    const sourceSpreadsheet = SpreadsheetApp.openById(project.spreadsheetId);
-    const sheet = sourceSpreadsheet.getSheetByName(project.tabName);
-    if (!sheet) return { passed: false, details: 'Configured source tab was not found.' };
-    if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
-      return { passed: false, details: 'Source tab has no header row.' };
-    }
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
-      .map(value => String(value == null ? '' : value).trim());
-    const nonBlank = headers.filter(Boolean).map(value => value.toLowerCase());
-    if (new Set(nonBlank).size !== nonBlank.length) {
-      return { passed: false, details: 'Duplicate source header names were found.' };
-    }
-    const mapping = getColumnMappings_(project.projectId);
-    const required = [APP.FIELDS.SET_ID, APP.FIELDS.ANNOTATOR_EMAIL, APP.FIELDS.STATUS];
-    const missing = required.filter(field => !mapping[field] ||
-      findHeaderIndex_(headers, mapping[field]) < 0);
-    if (missing.length) {
-      return { passed: false, details: 'Missing required mapping/header: ' + missing.join(', ') + '.' };
-    }
-    return { passed: true, details: 'Source spreadsheet and required mappings are readable.' };
-  } catch (error) {
-    return { passed: false, details: String(error && error.message ? error.message : error) };
-  }
-}
-
-function runConfigurationAudit(authToken) {
-  const actor = requireAdmin_(authToken);
-  const master = adminRequireStorage_();
-  const checks = [];
-  function add(severity, key, label, passed, details) {
-    checks.push({
-      severity: severity, key: key, label: label,
-      passed: Boolean(passed), details: String(details || '')
-    });
-  }
-  const employees = adminEmployeeObjects_();
-  const projects = adminProjectObjects_();
-  const access = adminAccessObjects_();
-  const mappings = adminMappingObjects_();
-  const activeAdmins = employees.filter(item => item.active && item.role === 'admin');
-  const duplicateEmails = Array.from(employees.reduce((map, employee) => {
-    map.set(employee.email, (map.get(employee.email) || 0) + 1); return map;
-  }, new Map()).entries()).filter(item => item[1] > 1).map(item => item[0]);
-  const duplicateProjects = Array.from(projects.reduce((map, project) => {
-    map.set(project.projectId, (map.get(project.projectId) || 0) + 1); return map;
-  }, new Map()).entries()).filter(item => item[1] > 1).map(item => item[0]);
-  add('BLOCKER', 'active_admin', 'At least one active administrator', activeAdmins.length > 0,
-    activeAdmins.length ? activeAdmins.length + ' active admin account(s).' : 'No active admin account exists.');
-  add('BLOCKER', 'employee_unique', 'Employee email uniqueness', duplicateEmails.length === 0,
-    duplicateEmails.length ? 'Duplicate emails: ' + duplicateEmails.join(', ') : 'No duplicate normalized emails.');
-  add('BLOCKER', 'project_unique', 'Project ID uniqueness', duplicateProjects.length === 0,
-    duplicateProjects.length ? 'Duplicate IDs: ' + duplicateProjects.join(', ') : 'No duplicate project IDs.');
-  add('WARNING', 'employee_rows', 'Employee records have valid email and role',
-    employees.every(item => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email) &&
-      ['admin', 'labeller'].includes(item.role)),
-    employees.every(item => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email) &&
-      ['admin', 'labeller'].includes(item.role)) ? 'All employee records pass basic field checks.' :
-      'At least one employee has an invalid email or role.');
-
-  const employeeByEmail = new Map();
-  employees.forEach(item => {
-    if (!employeeByEmail.has(item.email)) employeeByEmail.set(item.email, item);
-  });
-  const projectById = new Map();
-  projects.forEach(item => {
-    if (!projectById.has(item.projectId)) projectById.set(item.projectId, item);
-  });
-  const danglingAccess = access.filter(row => row.active &&
-    (!employeeByEmail.has(row.email) || !employeeByEmail.get(row.email).active ||
-      !projectById.has(row.projectId) || !projectById.get(row.projectId).active));
-  add('BLOCKER', 'access_references', 'Active access references active people and projects',
-    danglingAccess.length === 0,
-    danglingAccess.length ? danglingAccess.length + ' active Access row(s) reference missing or inactive records.' :
-      'No dangling active Access rows.');
-  const mappingKeys = new Map();
-  mappings.forEach(item => {
-    const key = item.projectId + '|' + item.canonicalField.toLowerCase();
-    mappingKeys.set(key, (mappingKeys.get(key) || 0) + 1);
-  });
-  const duplicateMappings = Array.from(mappingKeys.entries()).filter(item => item[1] > 1);
-  add('BLOCKER', 'mapping_unique', 'One mapping per project and canonical field',
-    duplicateMappings.length === 0,
-    duplicateMappings.length ? 'Duplicate mappings: ' + duplicateMappings.map(item => item[0]).join(', ') :
-      'No duplicate project/canonical-field mappings.');
-
-  const mappingByProject = new Map();
-  mappings.forEach(item => {
-    if (!mappingByProject.has(item.projectId)) mappingByProject.set(item.projectId, new Set());
-    mappingByProject.get(item.projectId).add(item.canonicalField);
-  });
-  const requiredMissing = projects.filter(project => project.active).filter(project => {
-    const present = mappingByProject.get(project.projectId) || new Set();
-    return [APP.FIELDS.SET_ID, APP.FIELDS.ANNOTATOR_EMAIL, APP.FIELDS.STATUS].some(field => !present.has(field));
-  }).map(project => project.projectId);
-  add('BLOCKER', 'required_mappings', 'Required task mappings exist for active projects',
-    requiredMissing.length === 0,
-    requiredMissing.length ? 'Projects missing required mappings: ' + requiredMissing.join(', ') :
-      'All active projects have Dataset Set Id, Annotator Mail and Status mappings.');
-
-  const sourceChecks = projects.filter(project => project.active).map(project => {
-    const result = adminCheckProjectSource_(project);
-    return { projectId: project.projectId, projectName: project.projectName, passed: result.passed, details: result.details };
-  });
-  sourceChecks.forEach(item => add('BLOCKER', 'source_' + item.projectId,
-    'Source integrity: ' + item.projectName, item.passed, item.details));
-
-  const env = String(PropertiesService.getScriptProperties().getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
-  add('BLOCKER', 'environment', 'Environment is explicitly labeled TEST',
-    env === 'TEST', env === 'TEST' ? 'APP_ENV_LABEL=TEST.' :
-      'Set APP_ENV_LABEL=TEST in the current test Apps Script project before test operations.');
-  const masterId = getMasterSpreadsheetId_();
-  const prodMasterId = String(PropertiesService.getScriptProperties().getProperty('PROD_MASTER_SPREADSHEET_ID') || '').trim();
-  add('BLOCKER', 'master_separation', 'TEST master is not configured as PROD master',
-    !prodMasterId || prodMasterId !== masterId,
-    prodMasterId && prodMasterId === masterId ? 'TEST and PROD master IDs are identical.' :
-      'No identical PROD master ID detected; keep separate master spreadsheets.');
-  add('WARNING', 'email_off', 'Issue email reminders remain disabled',
-    PropertiesService.getScriptProperties().getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) !== 'true',
-    PropertiesService.getScriptProperties().getProperty(ISSUE_SCAN.EMAIL_ENABLED_PROPERTY) === 'true'
-      ? 'Email reminders are enabled; verify recipient policy and quota.' : 'Email reminders are disabled.');
-  add('WARNING', 'schedule_off', 'Scheduled scans remain disabled during initial validation',
-    PropertiesService.getScriptProperties().getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) !== 'true',
-    PropertiesService.getScriptProperties().getProperty(ISSUE_SCAN.SCHEDULE_ENABLED_PROPERTY) === 'true'
-      ? 'A scheduled scan is enabled; review its trigger.' : 'No scheduled scan is enabled by this setting.');
-
-  const blockers = checks.filter(item => item.severity === 'BLOCKER' && !item.passed).length;
-  const warnings = checks.filter(item => item.severity === 'WARNING' && !item.passed).length;
-  const summary = { checks: checks.length, passed: checks.filter(item => item.passed).length, blockers: blockers, warnings: warnings };
-  adminWriteAudit_(actor, 'CONFIGURATION_AUDIT_RUN', 'CONFIGURATION', 'MASTER',
-    null, { summary: summary });
-  return {
-    ok: true, summary: summary, checks: checks, sourceChecks: sourceChecks,
-    passed: blockers === 0,
-    message: blockers === 0
-      ? 'Configuration audit found no blockers. Review warnings and live-test limitations before release.'
-      : 'Configuration audit found ' + blockers + ' blocker(s). Do not promote this environment.'
-  };
-}
-
-function getReleaseChecklist(authToken) {
-  const actor = requireAdmin_(authToken);
-  const readiness = getReleaseReadiness(authToken);
-  const health = getOperationalHealth(authToken);
-  const audit = runConfigurationAudit(authToken);
-  const steps = [
-    { key: 'synthetic_only', label: 'Only synthetic data used in current TEST', passed: readiness.environment === 'TEST' },
     { key: 'environment', label: 'Explicit APP_ENV_LABEL=TEST', passed: readiness.environment === 'TEST' },
     { key: 'gate', label: 'TEST data gate enabled for test execution', passed: readiness.dataGatePassed },
-    { key: 'email_off', label: 'Email reminders disabled until approved', passed: !readiness.emailEnabled },
-    { key: 'schedule_off', label: 'Scheduled scanners disabled until approved', passed: !readiness.scheduleEnabled },
-    { key: 'admin_exists', label: 'At least one active admin exists', passed: health.activeAdmins > 0 },
-    { key: 'config_audit', label: 'Configuration audit has no blockers', passed: audit.passed }
-  ];
-  const passed = steps.filter(item => item.passed).length;
-  return {
-    ok: true,
-    steps: steps,
-    summary: { total: steps.length, passed: passed, failed: steps.length - passed },
-    audit: audit.summary,
-    message: 'TEST readiness checklist only. It is not a production deployment approval.'
-  };
-}
-
-
-/**
- * Explicit TEST-only backup. This creates a private copy of the entire master spreadsheet.
- * It is disabled unless TEST_BACKUP_ENABLED=true and APP_ENV_LABEL=TEST.
- */
-function createPrivateTestBackup(authToken) {
-  const actor = requireAdmin_(authToken);
-  const props = PropertiesService.getScriptProperties();
-  const env = String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase();
-  if (env !== 'TEST') throw new Error('Backups are restricted to an explicitly labeled TEST environment in this release.');
-  if (props.getProperty('TEST_BACKUP_ENABLED') !== 'true') {
-    throw new Error('Backup creation is disabled. Set TEST_BACKUP_ENABLED=true only after reviewing the TEST backup policy.');
-  }
-  adminRequireStorage_();
-  const sourceId = getMasterSpreadsheetId_();
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) throw new Error('The application is busy. Try again shortly.');
-  let copy = null;
-  try {
-    const timestamp = Utilities.formatDate(new Date(), APP.TIME_ZONE, 'yyyyMMdd-HHmmss');
-    const sourceFile = DriveApp.getFileById(sourceId);
-    copy = sourceFile.makeCopy('Labeller Dashboard TEST master backup ' + timestamp);
-    try {
-      copy.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-      if (copy.getSharingAccess() !== DriveApp.Access.PRIVATE) {
-        throw new Error('Backup copy is not private after setting sharing.');
-      }
-      const backupSpreadsheet = SpreadsheetApp.openById(copy.getId());
-      const requiredTabs = Object.keys(ATTENDANCE.HEADERS)
-        .concat(Object.keys(ISSUE_SCAN.HEADERS), Object.keys(ADMIN_CONSOLE.HEADERS))
-        .concat([APP.SHEETS.EMPLOYEES, APP.SHEETS.PROJECTS, APP.SHEETS.ACCESS,
-          APP.SHEETS.COLUMN_MAP, AUTH.CREDENTIAL_SHEET]);
-      const missing = requiredTabs.filter(name => !backupSpreadsheet.getSheetByName(name));
-      if (missing.length) throw new Error('Backup copy is missing required tabs: ' + missing.join(', '));
-      const log = getMasterSpreadsheet_().getSheetByName('Backup_Log');
-      const backupId = Utilities.getUuid();
-      const url = copy.getUrl();
-      log.appendRow([
-        backupId, new Date(), actor.email, env, sourceId,
-        copy.getId(), url, 'CREATED', 'Private copy verified; restore drill is still manual.'
-      ]);
-      let auditWarning = '';
-      try {
-        adminWriteAudit_(actor, 'TEST_MASTER_BACKUP_CREATED', 'BACKUP', backupId, null, {
-          backupSpreadsheetId: copy.getId(), status: 'CREATED'
-        });
-      } catch (error) {
-        auditWarning = ' Backup exists, but Admin_Audit_Log could not be updated; review Backup_Log.';
-      }
-      return {
-        ok: true, backupId: backupId, spreadsheetId: copy.getId(), url: url,
-        message: 'Private TEST master backup created and required tabs verified.' + auditWarning,
-        restoreNote: 'Do not overwrite the active master in place. For a restore drill, make another private copy of this backup, point a separate TEST Apps Script project to that copy, and verify before swapping any live configuration.'
-      };
-    } catch (error) {
-      try { copy.setTrashed(true); } catch (trashError) {}
-      throw error;
-    }
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function verifyPrivateTestBackup(authToken, backupSpreadsheetIdValue) {
-  requireAdmin_(authToken);
-  const props = PropertiesService.getScriptProperties();
-  if (String(props.getProperty('APP_ENV_LABEL') || '').trim().toUpperCase() !== 'TEST') {
-    throw new Error('Backup verification is restricted to an explicitly labeled TEST environment.');
-  }
-  if (props.getProperty('TEST_BACKUP_ENABLED') !== 'true') {
-    throw new Error('Backup verification is disabled. Set TEST_BACKUP_ENABLED=true only for the approved TEST drill.');
-  }
-  const backupId = String(backupSpreadsheetIdValue || '').trim();
-  if (!/^[A-Za-z0-9_-]{20,100}$/.test(backupId)) throw new Error('Enter a valid backup spreadsheet ID.');
-  const master = adminRequireStorage_();
-  const log = master.getSheetByName('Backup_Log');
-  const data = adminReadRows_(log, ADMIN_CONSOLE.HEADERS.Backup_Log);
-  const logged = data.rows.find(row =>
-    String(row[data.headerMap['Backup Spreadsheet ID']] || '') === backupId &&
-    String(row[data.headerMap.Status] || '') === 'CREATED');
-  if (!logged) throw new Error('Backup ID was not found as a successfully created backup in Backup_Log.');
-  const file = DriveApp.getFileById(backupId);
-  if (file.getSharingAccess() !== DriveApp.Access.PRIVATE) {
-    throw new Error('Backup is not private. Stop and correct its sharing before using it.');
-  }
-  const spreadsheet = SpreadsheetApp.openById(backupId);
-  const requiredTabs = Object.keys(ATTENDANCE.HEADERS)
-    .concat(Object.keys(ISSUE_SCAN.HEADERS), Object.keys(ADMIN_CONSOLE.HEADERS))
-    .concat([APP.SHEETS.EMPLOYEES, APP.SHEETS.PROJECTS, APP.SHEETS.ACCESS,
-      APP.SHEETS.COLUMN_MAP, AUTH.CREDENTIAL_SHEET]);
-  const missing = requiredTabs.filter(name => !spreadsheet.getSheetByName(name));
-  if (missing.length) throw new Error('Backup is incomplete. Missing tabs: ' + missing.join(', '));
-  return {
-    ok: true,
-    backupSpreadsheetId: backupId,
-    name: file.getName(),
-    private: true,
-    tabCount: spreadsheet.getSheets().length,
-    requiredTabCount: requiredTabs.length,
-    message: 'Backup privacy and required-tab check passed. This does not prove data-level restore correctness; perform a separate TEST restore drill.'
-  };
-}
-
-function listPrivateTestBackups(authToken) {
-  requireAdmin_(authToken);
-  const master = getMasterSpreadsheet_();
-  const sheet = master.getSheetByName('Backup_Log');
-  if (!sheet) return { ok: true, ready: false, backups: [] };
-  const data = adminReadRows_(sheet, ADMIN_CONSOLE.HEADERS.Backup_Log);
-  return {
-    ok: true, ready: true,
-    backups: data.rows.slice(-20).reverse().map(row => ({
-      backupId: String(row[data.headerMap['Backup ID']] || ''),
-      createdAt: issueFormatDateTime_(row[data.headerMap['Created At']]),
-      createdBy: String(row[data.headerMap['Created By']] || ''),
-      backupSpreadsheetId: String(row[data.headerMap['Backup Spreadsheet ID']] || ''),
-      url: String(row[data.headerMap['Backup URL']] || ''),
-      status: String(row[data.headerMap.Status] || ''),
-      details: String(row[data.headerMap.Details] || '')
-    }))
-  };
-}
 
 // ===== SOURCE: apps-script/Code.gs =====
 function doGet() {
