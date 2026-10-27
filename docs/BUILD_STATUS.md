@@ -4,76 +4,65 @@ Last updated: 2026-10-27
 
 ## Current repository state
 
-Phase 0/1 and Phase 2 source are deployed to a dedicated TEST Apps Script project. Browser-based live checks have verified authentication/session behavior, assigned-task isolation, clock-in/out, break start/end, leave submission/review, short-leave time validation and the leave-overlap regression after its fix. Phase 3 issue/TAT code is now added to the development branch and passed parser and in-memory scan smoke checks, but it has not yet been copied into the live TEST project or verified against live Sheets. No production deployment or merge has been performed.
+The development branch build/phase-0-1-dashboard contains source for all planned phase areas (0–6). Draft PR #1 remains open and unmerged. The newer Phase 3–6 source and UI are **not fully verified in the live Google Apps Script TEST deployment**. No production deployment or pilot has been approved.
 
-Development must follow the agreed six-phase plan. Do not use unrelated repository references or introduce features outside the agreed project requirements.
+The source of truth remains the modular files under apps-script/; browser-deploy/Main.gs is the browser-copy bundle and browser-deploy/Index.html is the matching UI. Existing project task spreadsheets stay read-only. App-owned records are written only to the separate private master spreadsheet.
 
-## Implemented in source
+## Phase-by-phase status
 
-- Apps Script web-app entry point and responsive HTML shell.
-- Safe status endpoint that reveals no active-user or script-owner identity.
-- Access-code login for personal Gmail users, with high-entropy codes stored only as SHA-256 hashes in a private `Employee_Credentials` tab.
-- Short-lived random server-cache sessions; data endpoints recheck active employee status and credential hash on each request.
-- Editor-only access-code initialization/provisioning helpers, not exposed as browser-callable functions.
-- Identity gate closed unless Script Property `IDENTITY_GATE_PASSED` is exactly `true`.
-- `getMyWork()` now checks the identity gate before opening the master spreadsheet or reading task data.
-- Server-side active employee and role validation.
-- Server-side project access filtering and source-sheet reads by configured tab name.
-- Server-side filtering by the authenticated user's normalized email; no browser email parameter.
-- Read-only My Work table and basic row/status/set/project counts.
-- Visible project errors and a partial-data warning if one or more project reads fail.
-- Date-only values serialized in the configured project timezone to reduce browser timezone shifts.
-- Duplicate mapping and duplicate header checks.
-- Phase 2 attendance actions: clock-in, clock-out, start/end break, and leave requests for full day, half day (AM/PM) and short leave.
-- Admin-only initialization of five app-owned attendance tabs; mismatched existing headers fail closed.
-- Script-lock-protected actions with request IDs and replay records to reduce duplicate writes on retries.
-- Append-only attendance event log; server-side timestamps and Asia/Kolkata date keys.
-- Admin approve/reject actions for leave requests; labellers can only list their own requests.
-- Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
-- Phase 3 issue/TAT module (`IssueScanner.gs`): admin-only storage initialization, read-only chunked scans, stable issue keys, missing-data/assignment/hold findings, optional per-project/status TAT rules, scan-run duration and coverage logs, partial-run cursor, resolve action, daily-deduplicated reminder digest with MailApp quota check, and opt-in 6/12-hour scan trigger. Emails and triggers default to disabled.
-- Phase 3 synthetic in-memory smoke test: a 3-row fake source produced `ANNOTATOR_NOT_ACTIVE` and `TAT_BREACH`; a following scan after correcting the synthetic row marked both issues `RESOLVED`. This is not a live Apps Script test.
-- In-memory mocked verification: a previous revision passed combined Apps Script/inline JavaScript syntax checks and 28 access-code, session, task-isolation, attendance and leave behavior checks. Those results predate the live date-normalization regression fix; the corrected revision's complete mock/parser suite must be rerun. See `docs/VERIFICATION_LOG.md`.
-- Browser-only deployment bundle maintained under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML have been checked against modular sources at the matching revision.
-- `docs/BROWSER_ONLY_SETUP.md` describes browser-only setup. Live TEST now exists; remaining runtime edge checks are tracked in `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md`.
+| Phase | Implemented in source | Verified in live TEST? |
+|---|---|---|
+| 0 — Identity/authentication gate | Access-code authentication, hashed credentials, short-lived session tokens, active employee/role checks, sign-out and credential-rotation invalidation. | Selected checks passed: valid/invalid code, sign-out, rotation invalidation and data gate behavior. More inactive/duplicate account and direct role-denial tests remain. |
+| 1 — Read-only My Work | Project access filtering, authenticated-email row isolation, summary cards, escaped task table and partial-source error display. | Synthetic assignment isolation passed; large task tabs and failure edge cases remain. |
+| 2 — Attendance/leave | Clock-in/out, breaks, full/half/short leave, admin review, request idempotency, event log and guarded stale-session closure function. | Selected flows passed: clock-in/out, break start/end, full-day leave approval, short-leave validation, own-request privacy and overlap regression fix. Half-day, past-date, concurrency and recovery tests remain. |
+| 3 — Issue/TAT | Admin-only chunked source scans, stable issue keys, issue registry, scan-run log/cursor, explicit per-project/status TAT rules, resolve flow, digest preview, quota-aware email guard and opt-in 6/12-hour trigger. | Parser and in-memory scan smoke passed; the live TEST project still needs the updated bundle, synthetic scan and TAT/partial-run checks. Emails and triggers must stay off during initial verification. |
+| 4 — Admin/reporting | People/projects/access/mapping console, input validation, last-admin/self-demotion protections, audit logging, date-filtered team reports, visual summaries/charts, partial-data flag and private report snapshots. | Source/UI present. Live admin role-denial, configuration CRUD, access revoke, report hand-calculation, partial-report and snapshot tests remain. |
+| 5 — Operations/reliability tooling | Read-only health overview, configuration/source audit, TEST release checklist, explicit TEST backup creation/verification, trigger/config metadata and audit log. | Source/UI present. Tooling does not replace concurrency/load/failure-injection tests or a real separate restore drill. Those have not been completed. |
+| 6 — Controlled rollout | Environment/master binding, production approval gate, TEST/PROD separation rules and staged rollout checklist. | Code and runbook present. No separate PROD Apps Script project or master has been created/approved here; no pilot or production rollout has been executed. |
 
-## Not implemented
+## Implemented source features
 
-- Automatic trigger installation for stale-session closure (planned in Phase 3); the closure function is not scheduled automatically.
-- Full admin attendance history/dashboard (Phase 4).
-- Duplicate task detection (needs a confirmed stable task key/business rule), validation-specific reminders and heartbeat monitoring.
-- Live deployment/runtime validation of Phase 3 scanning, TAT rules, digest delivery and scheduled-trigger behavior.
-- Admin People/Projects management or grant/revoke flows.
-- My Reports, attendance history, charts, snapshots or performance/load tests.
-- Remaining browser-based edge tests, production deployment or pilot. Core login, task-isolation and selected Phase 2 workflows have been tested live in the dedicated TEST deployment.
+- Access-code login for personal Gmail users; email is an account lookup, not Google SSO.
+- Server-side session, role and active-employee validation on protected endpoints.
+- Project assignment filtering and read-only source task reads.
+- Attendance and leave records in app-owned private-master tabs.
+- Issue/TAT scan storage, run metrics and guarded reminder/schedule functions.
+- Admin-only management of Employees, Projects, Access and Column_Map.
+- Admin audit log and private team-report snapshots.
+- Operational health view, configuration audit and TEST readiness checklist.
+- Explicit environment/master matching for the app data gate.
+- Private TEST backup functions that require a TEST label, matching TEST master, admin storage and an explicit backup-enable property.
 
-## Known limitations and release blockers
+## Remaining verification / release blockers
 
-1. **Personal Gmail authentication uses access codes.** The email is a lookup key, not proof of Google account identity. Codes must be high entropy and distributed privately; this is app-level authentication, not Google SSO.
-2. **Status semantics are provisional.** The current completed-status list is proposed in the build plan and must be confirmed against the actual task workflow before metrics are used operationally.
-3. **Task counts are source rows.** Distinct sets are counted by Project ID + Dataset Set ID. Confirm this is the intended counting unit.
-4. **Date fields are treated as date-only.** If a source column contains date-time values, this serializer intentionally presents the date portion only; confirm the source's actual semantics.
-5. **Required mappings are enforced for Set ID, Annotator Mail and Status.** The `Required` flag in Column_Map is documented for configuration but additional required-field validation belongs to the issue-scanner phase.
-6. **My Work reads are not chunked yet.** Phase 1 currently reads each configured task tab in one `getDataRange()` call. Phase 3 issue scanning is chunked; large My Work datasets still need load testing or a paginated/chunked design before wider rollout.
-7. **Partial totals can still be displayed.** The UI now labels them as partial and lists project failures. Do not use partial totals for decisions.
-8. **No automated Apps Script test runner is included.** Static inspection cannot prove deployment, authorization, quota, or Google Sheets runtime behavior.
+- Copy the current browser bundle into the existing TEST Apps Script project and deploy a **new version**, preserving owner execution and signed-in-Google-account access settings.
+- Set and verify APP_ENV_LABEL=TEST, MASTER_SPREADSHEET_ID equal to TEST_MASTER_SPREADSHEET_ID, and IDENTITY_GATE_PASSED=false during auth testing. Enable the TEST data gate only after auth checks pass.
+- Complete the Phase 3 live scan, configured test-only TAT rule, partial-run coverage, digest preview and disabled-trigger checks.
+- Complete Phase 4 write-permission tests, project-access revoke tests, date filters, chart cross-checks, report partial-data behavior and snapshot prevention when data is partial.
+- Complete Phase 5 concurrent actions, idempotency/replay, midnight/timezone, quota/load tests, write-failure recovery, private backup verification and a separate TEST restore drill.
+- Confirm completed-status semantics, task/set counting rules, date-field meaning and operational attendance/leave policies with the business owner.
+- Complete a separate-environment Phase 6 review. Never store a PROD master ID in TEST. Do not deploy real employee data or enable reminders/schedules until explicitly accepted.
+- Run a controlled synthetic pilot and record human acceptance before broader access.
 
-## Phase 2 verification status
+## Known limitations
 
-### Verified live in TEST
-- Attendance storage initialized in the private master spreadsheet.
-- Labeller clock-in created an `OPEN` session; clock-out changed that session to `CLOSED`.
-- A tea break was started and the same break row was subsequently marked `CLOSED` with an end request ID.
-- Full-day leave request was submitted and approved by Admin; the Labeller later saw their own request without approval controls.
-- Invalid short-leave times (end before start) were rejected; a valid short-leave interval was accepted.
-- A duplicate same-date request was first reproduced as a regression; after the date normalization fix, the app returned the overlapping-leave rejection and the test duplicate was rejected by Admin with an audit note. The sheet showed the original approved row and the rejected regression row, with no additional row from the latest blocked attempt.
+1. **Personal Gmail auth is app-level access-code authentication**, not proof that the browser's active Google account equals the email typed into the form.
+2. **Task status semantics are provisional.** The completed-status list must be agreed before reports are used for decisions.
+3. **My Work currently reads each configured source tab in one read.** It has not passed load testing for large source tabs.
+4. **The report row limit is a safety cap, not pagination.** If reached, reports must be marked partial and cannot be snapshotted.
+5. **Google Sheets multi-tab writes are not transactional.** Script locks serialize this Apps Script project's calls, but failure injection and recovery still require real TEST validation.
+6. **No automated Apps Script service emulator or CI test workflow exists in the repository.** Static syntax parsing and in-memory mocks cannot prove actual permissions, service quotas, browser deployment behavior or data integrity.
+7. **A verified backup is not a restore test.** Restore must be rehearsed with a separate TEST copy/project, never by overwriting the active master in place.
 
-### Still to verify before Phase 2 is complete
-- Half-day leave AM/PM behavior; direct API denial for labeller/admin-only actions; unauthorized access to another employee's attendance/leave records.
-- Idempotent retry and request-ID mismatch in live Sheets, concurrent clock-in/break/leave calls, clock-out while a break is open, unmatched/duplicate break actions, and previous-day open-session behavior.
-- Event log completeness, date/timezone rendering after the latest deployed bundle, multi-tab partial-write recovery, and stale-session closure with an approved `ATTENDANCE_MAX_SESSION_HOURS` value.
+## Phase 0/1/2 live TEST notes
 
-The 28/28 in-memory mock results predate the live date-normalization regression and must not substitute for these remaining live tests. Do not merge or release to production until critical TEST gates pass.
+- The Labeller signed in and saw exactly the two synthetic task rows assigned to their normalized email; another user's row stayed hidden.
+- Wrong-code rejection, sign-out behavior and access-code rotation invalidation were observed.
+- Clock-in/out and break start/end were recorded in the private master. Full-day leave was submitted and approved, and the Labeller could view their own leave without review controls.
+- Invalid short-leave time order was rejected; a valid short leave was accepted.
+- The same-date leave-overlap regression was fixed and retested: the duplicate attempt was blocked without adding another row. The duplicate record created by the earlier failing test was rejected with an audit note.
+- Small display/polish issues were deferred; they are not evidence of data-processing correctness.
 
 ## Release rule
 
-Keep the data gate enabled only in TEST while synthetic testing is active; disable it if a regression or data-isolation issue appears. Do not connect production data, merge the branch, or enable scheduled triggers/outgoing emails until authorization edge cases, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.
+Keep PR #1 a draft and unmerged until the relevant live TEST gates pass. Do not enable issue email, install scheduled triggers, use real employee data, or create a production deployment until source, permissions, operational tests, metrics and human acceptance are reviewed.
