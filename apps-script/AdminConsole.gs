@@ -99,6 +99,16 @@ function adminWriteAudit_(actor, action, entityType, entityKey, beforeValue, aft
   ]);
 }
 
+function adminWriteAuditSafely_(actor, action, entityType, entityKey, beforeValue, afterValue) {
+  try {
+    adminWriteAudit_(actor, action, entityType, entityKey, beforeValue, afterValue);
+    return '';
+  } catch (error) {
+    try { Logger.log('Admin audit write failed after action %s: %s', action, String(error && error.message ? error.message : error)); } catch (logError) {}
+    return ' WARNING: the change may have saved, but its audit row could not be written. Check the record and Admin_Audit_Log before retrying.';
+  }
+}
+
 function adminReadRows_(sheet, requiredHeaders) {
   const table = readTable_(sheet);
   const map = headerMap_(table.headers);
@@ -311,10 +321,10 @@ function saveEmployeeAdmin(authToken, payload) {
       accessCodeProvisioning: targetIndex < 0 ? 'issue-access-code-privately-in-Apps-Script-editor'
         : (mustReissueAccessCode ? 'previous-code-and-sessions-revoked; issue-a-new-code' : 'existing-code-preserved'),
       revokedProjectAccessGrants: revokedProjectAccessGrants };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'EMPLOYEE_UPDATED' : 'EMPLOYEE_CREATED', 'EMPLOYEE', email, before, after);
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'EMPLOYEE_UPDATED' : 'EMPLOYEE_CREATED', 'EMPLOYEE', email, before, after);
     return {
-      ok: true, message: targetIndex >= 0 ? 'Employee updated.' : 'Employee created. Generate and deliver an access code privately before the employee signs in.',
-      employee: after
+      ok: true, message: (targetIndex >= 0 ? 'Employee updated.' : 'Employee created. Generate and deliver an access code privately before the employee signs in.') + auditWarning,
+      auditWarning: auditWarning, employee: after
     };
   });
 }
@@ -365,8 +375,8 @@ function saveProjectAdmin(authToken, payload) {
     else sheet.appendRow(row);
     const after = { projectId: projectId, projectName: projectName, spreadsheetId: spreadsheetId,
       tabName: tabName, timeZone: timeZone, active: active };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'PROJECT_UPDATED' : 'PROJECT_CREATED', 'PROJECT', projectId, before, after);
-    return { ok: true, message: targetIndex >= 0 ? 'Project updated.' : 'Project created.', project: after };
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'PROJECT_UPDATED' : 'PROJECT_CREATED', 'PROJECT', projectId, before, after);
+    return { ok: true, message: (targetIndex >= 0 ? 'Project updated.' : 'Project created.') + auditWarning, auditWarning: auditWarning, project: after };
   });
 }
 
@@ -409,9 +419,9 @@ function setProjectAccessAdmin(authToken, emailValue, projectIdValue, activeValu
       sheet.appendRow(row);
     }
     const after = { email: email, projectId: projectId, active: active };
-    adminWriteAudit_(actor, active ? 'PROJECT_ACCESS_GRANTED' : 'PROJECT_ACCESS_REVOKED',
+    const auditWarning = adminWriteAuditSafely_(actor, active ? 'PROJECT_ACCESS_GRANTED' : 'PROJECT_ACCESS_REVOKED',
       'PROJECT_ACCESS', email + '|' + projectId, before, after);
-    return { ok: true, message: active ? 'Project access granted.' : 'Project access revoked.' };
+    return { ok: true, message: (active ? 'Project access granted.' : 'Project access revoked.') + auditWarning, auditWarning: auditWarning };
   });
 }
 
@@ -454,9 +464,9 @@ function saveProjectMappingAdmin(authToken, payload) {
     if (targetIndex >= 0) sheet.getRange(targetIndex + 2, 1, 1, raw.headers.length).setValues([row]);
     else sheet.appendRow(row);
     const after = { projectId: projectId, canonicalField: canonicalField, sheetHeader: sheetHeader, required: required };
-    adminWriteAudit_(actor, targetIndex >= 0 ? 'PROJECT_MAPPING_UPDATED' : 'PROJECT_MAPPING_CREATED',
+    const auditWarning = adminWriteAuditSafely_(actor, targetIndex >= 0 ? 'PROJECT_MAPPING_UPDATED' : 'PROJECT_MAPPING_CREATED',
       'COLUMN_MAPPING', projectId + '|' + canonicalField, before, after);
-    return { ok: true, message: targetIndex >= 0 ? 'Column mapping updated.' : 'Column mapping created.', mapping: after };
+    return { ok: true, message: (targetIndex >= 0 ? 'Column mapping updated.' : 'Column mapping created.') + auditWarning, auditWarning: auditWarning, mapping: after };
   });
 }
 
@@ -696,11 +706,11 @@ function createTeamSnapshot(authToken, filters) {
       snapshotId, now, report.filters.fromDate, report.filters.toDate,
       report.filters.dateField, actor.email, json
     ]);
-    adminWriteAudit_(actor, 'TEAM_SNAPSHOT_CREATED', 'SNAPSHOT', snapshotId, null, {
+    const auditWarning = adminWriteAuditSafely_(actor, 'TEAM_SNAPSHOT_CREATED', 'SNAPSHOT', snapshotId, null, {
       fromDate: report.filters.fromDate, toDate: report.filters.toDate,
       dateField: report.filters.dateField, bytes: json.length
     });
-    return { ok: true, snapshotId: snapshotId, message: 'Team report snapshot saved.' };
+    return { ok: true, snapshotId: snapshotId, auditWarning: auditWarning, message: 'Team report snapshot saved.' + auditWarning };
   });
 }
 
