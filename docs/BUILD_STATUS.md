@@ -1,10 +1,10 @@
 # Build Status
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Current repository state
 
-Phase 0/1 starter code and Phase 2 attendance/leave code are committed on the development branch. It has not been deployed to Apps Script or tested against live Google accounts or real spreadsheets. GitHub commit success is not runtime verification.
+Phase 0/1 and Phase 2 source are committed on the development branch and have been deployed to a dedicated TEST Apps Script project. Browser-based live checks have verified authentication/session behavior, assigned-task isolation, clock-in/out, break start/end, leave submission and review, and the leave-overlap regression after its fix. Several Phase 2 edge cases and Phase 3–6 remain. No production deployment or merge has been performed.
 
 Development must follow the agreed six-phase plan. Do not use unrelated repository references or introduce features outside the agreed project requirements.
 
@@ -31,8 +31,8 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 - Admin approve/reject actions for leave requests; labellers can only list their own requests.
 - Configurable stale-session closure function; it refuses to run until `ATTENDANCE_MAX_SESSION_HOURS` is explicitly set.
 - In-memory mocked verification: combined Apps Script syntax and dashboard inline JavaScript syntax passed; 28 access-code, session, task-isolation, attendance and leave behavior checks passed against the current modular source. See `docs/VERIFICATION_LOG.md` for exact coverage and limitations.
-- Browser-only deployment bundle added under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML are verified byte-for-byte against the current modular source.
-- `docs/BROWSER_ONLY_SETUP.md` describes setup and TEST deployment using only a browser; real Apps Script identity and spreadsheet checks remain outstanding.
+- Browser-only deployment bundle maintained under `browser-deploy/`: `Main.gs`, `Index.html`, and `appsscript.json`. The combined script and HTML have been checked against modular sources at the matching revision.
+- `docs/BROWSER_ONLY_SETUP.md` describes browser-only setup. Live TEST now exists; remaining runtime edge checks are tracked in `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md`.
 
 ## Not implemented
 
@@ -57,8 +57,21 @@ Development must follow the agreed six-phase plan. Do not use unrelated reposito
 
 ## Phase 2 verification status
 
-Phase 2 source has been added and read back from GitHub after push. It has **not** been executed in Apps Script. Required tests include identity/role denials, request replay, concurrent actions, break invariants, leave overlap/review, date/timezone handling, partial-write recovery, and stale-session closure. The maximum session duration must be approved and configured before stale-session closure is enabled. Do not call Phase 2 complete until the TEST checklist passes.
+### Verified live in TEST
+- Attendance storage initialized in the private master spreadsheet.
+- Labeller clock-in created an `OPEN` session; clock-out changed that session to `CLOSED`.
+- A tea break was started and the same break row was subsequently marked `CLOSED` with an end request ID.
+- Full-day leave request was submitted and approved by Admin; the Labeller later saw their own request without approval controls.
+- Invalid short-leave times (end before start) were rejected; a valid short-leave interval was accepted.
+- A duplicate same-date request was first reproduced as a regression; after the date normalization fix, the app returned the overlapping-leave rejection and the test duplicate was rejected by Admin with an audit note. The sheet showed the original approved row and the rejected regression row, with no additional row from the latest blocked attempt.
+
+### Still to verify before Phase 2 is complete
+- Half-day leave AM/PM behavior; direct API denial for labeller/admin-only actions; unauthorized access to another employee's attendance/leave records.
+- Idempotent retry and request-ID mismatch in live Sheets, concurrent clock-in/break/leave calls, clock-out while a break is open, unmatched/duplicate break actions, and previous-day open-session behavior.
+- Event log completeness, date/timezone rendering after the latest deployed bundle, multi-tab partial-write recovery, and stale-session closure with an approved `ATTENDANCE_MAX_SESSION_HOURS` value.
+
+The 28/28 in-memory mock results predate the live date-normalization regression and must not substitute for these remaining live tests. Do not merge or release to production until critical TEST gates pass.
 
 ## Release rule
 
-Keep the data gate closed until valid/invalid access-code tests, role checks, session rotation/revocation and privacy isolation pass in the deployed TEST app. Do not connect production data or enable scheduled triggers/outgoing emails until privacy isolation, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.
+Keep the data gate enabled only in TEST while synthetic testing is active; disable it if a regression or data-isolation issue appears. Do not connect production data, merge the branch, or enable scheduled triggers/outgoing emails until authorization edge cases, metric definitions, date handling, quotas, backup/restore and pilot acceptance are verified.
