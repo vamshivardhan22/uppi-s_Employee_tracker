@@ -633,6 +633,20 @@ function attendanceDateKey_(date) {
   return Utilities.formatDate(date, APP.TIME_ZONE, 'yyyy-MM-dd');
 }
 
+function attendanceDateValueKey_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, APP.TIME_ZONE, 'yyyy-MM-dd');
+  }
+  const text = String(value == null ? '' : value).trim();
+  if (!text) return '';
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) {
+    const parsedIso = new Date(text + 'T00:00:00Z');
+    return !isNaN(parsedIso.getTime()) && parsedIso.toISOString().slice(0, 10) === text ? text : '';
+  }
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime()) ? '' : Utilities.formatDate(parsed, APP.TIME_ZONE, 'yyyy-MM-dd');
+}
+
 function attendanceTimeKey_(date) {
   return Utilities.formatDate(date, APP.TIME_ZONE, 'HH:mm');
 }
@@ -799,9 +813,12 @@ function attendanceStatusForUser_(user, sheets) {
   const session = attendanceOpenSession_(sheets, user.email, today) || null;
   const openSession = attendanceCurrentSession_(sheets, user.email) || null;
   const openBreak = openSession ? attendanceOpenBreak_(sheets, openSession['Session ID']) : null;
-  const leave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).filter(row =>
-    row.Email === user.email && typeof row['Start Date'] === 'string' &&
-    typeof row['End Date'] === 'string' && row['Start Date'] <= today && row['End Date'] >= today);
+  const leave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).filter(row => {
+    const startKey = attendanceDateValueKey_(row['Start Date']);
+    const endKey = attendanceDateValueKey_(row['End Date']);
+    return row.Email === user.email && Boolean(startKey) && Boolean(endKey) &&
+      startKey <= today && endKey >= today;
+  });
   return {
     ok: true,
     user: { email: user.email, displayName: user.displayName, role: user.role },
@@ -820,8 +837,8 @@ function attendanceStatusForUser_(user, sheets) {
       startAt: openBreak['Start At'] instanceof Date ? attendanceTimestamp_(openBreak['Start At']) : '' } : null,
     todayLeaveRequests: leave.map(row => ({
       leaveId: row['Leave ID'], type: row['Leave Type'], status: row.Status,
-      startDate: String(row['Start Date'] || ''),
-      endDate: String(row['End Date'] || '')
+      startDate: attendanceDateValueKey_(row['Start Date']),
+      endDate: attendanceDateValueKey_(row['End Date'])
     }))
   };
 }
@@ -943,9 +960,11 @@ function attendanceSubmitLeaveRequest(authToken, payload, requestId) {
     if (type === 'half_day' && start !== end) throw new Error('Half-day leave must be requested for one date.');
     const existingLeave = attendanceRows_(sheets[ATTENDANCE.SHEETS.LEAVE]).find(row => {
       if (row.Email !== user.email || !['PENDING', 'APPROVED'].includes(row.Status)) return false;
-      if (typeof row['Start Date'] !== 'string' || typeof row['End Date'] !== 'string') return false;
-      const existingStart = row['Start Date'];
-      const existingEnd = row['End Date'];
+      const existingStart = attendanceDateValueKey_(row['Start Date']);
+      const existingEnd = attendanceDateValueKey_(row['End Date']);
+      if (!existingStart || !existingEnd) {
+        throw new Error('An existing leave request has an invalid date. Ask the administrator to review it before submitting another request.');
+      }
       return start <= existingEnd && end >= existingStart;
     });
     if (existingLeave) throw new Error('You already have a pending or approved leave request overlapping these dates.');
@@ -973,8 +992,8 @@ function getAttendanceLeaveRequests(authToken) {
     role: user.role,
     rows: visible.map(row => ({
       leaveId: row['Leave ID'], email: user.role === 'admin' ? row.Email : '',
-      startDate: String(row['Start Date'] || ''),
-      endDate: String(row['End Date'] || ''),
+      startDate: attendanceDateValueKey_(row['Start Date']),
+      endDate: attendanceDateValueKey_(row['End Date']),
       leaveType: row['Leave Type'], partialPeriod: row['Partial Period'],
       startTime: row['Start Time'], endTime: row['End Time'], reason: row.Reason,
       status: row.Status, requestedAt: row['Requested At'] instanceof Date ? attendanceTimestamp_(row['Requested At']) : ''
