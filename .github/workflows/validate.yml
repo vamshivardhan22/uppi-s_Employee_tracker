@@ -38,6 +38,9 @@ jobs:
       - name: Validate bundled copies and release invariants
         run: python scripts/validate_repo.py
 
+      - name: Exercise identity-gate behavior with fake Script Properties
+        run: node scripts/test_release_gate.js
+
       - name: Parse modular Apps Script files and browser bundle
         shell: bash
         run: |
