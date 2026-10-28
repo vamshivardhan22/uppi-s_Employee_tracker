@@ -30,10 +30,11 @@ const context = {
 };
 vm.createContext(context);
 
-const sourcePath = path.join(__dirname, "..", "apps-script", "Attendance.gs");
-const source = fs.readFileSync(sourcePath, "utf8");
+const root = path.join(__dirname, "..");
+const configSource = fs.readFileSync(path.join(root, "apps-script", "Config.gs"), "utf8");
+const source = fs.readFileSync(path.join(root, "apps-script", "Attendance.gs"), "utf8");
 vm.runInContext(
-  source + "\nthis.__dateKeyUnderTest = attendanceDateValueKey_; this.__makeDate = iso => new Date(iso);",
+  configSource + "\\n" + source + "\\nthis.__dateKeyUnderTest = attendanceDateValueKey_; this.__makeDate = iso => new Date(iso);
   context
 );
 
