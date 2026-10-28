@@ -34,7 +34,7 @@ const root = path.join(__dirname, "..");
 const configSource = fs.readFileSync(path.join(root, "apps-script", "Config.gs"), "utf8");
 const source = fs.readFileSync(path.join(root, "apps-script", "Attendance.gs"), "utf8");
 vm.runInContext(
-  configSource + "\n" + source + "\nthis.__dateKeyUnderTest = attendanceDateValueKey_; this.__makeDate = iso => new Date(iso);
+  configSource + "\n" + source + "\nthis.__dateKeyUnderTest = attendanceDateValueKey_; this.__makeDate = iso => new Date(iso);",
   context
 );
 
