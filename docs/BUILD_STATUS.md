@@ -1,12 +1,14 @@
 # Build Status
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Current repository state
 
 The development branch build/phase-0-1-dashboard contains source for all planned phase areas (0–6). Draft PR #1 remains open and unmerged. The newer Phase 3–6 source and UI are **not fully verified in the live Google Apps Script TEST deployment**. No production deployment or pilot has been approved.
 
 The source of truth remains the modular files under apps-script/; browser-deploy/Main.gs is the browser-copy bundle and browser-deploy/Index.html is the matching UI. Existing project task spreadsheets stay read-only. App-owned records are written only to the separate private master spreadsheet.
+
+A GitHub Actions validation workflow has been added. Run #4 on 2026-10-28 passed: 17/17 repository source/release-guard checks, plus Node.js syntax checks for modular Apps Script, the combined bundle and dashboard client JavaScript. This is repository-level regression protection only; it does not test deployed Google Apps Script permissions, live sheet I/O, quotas, concurrency or restore behavior.
 
 ## Phase-by-phase status
 
@@ -51,7 +53,7 @@ The source of truth remains the modular files under apps-script/; browser-deploy
 3. **My Work currently reads each configured source tab in one read.** It has not passed load testing for large source tabs.
 4. **The report row limit is a safety cap, not pagination.** If reached, reports must be marked partial and cannot be snapshotted.
 5. **Google Sheets multi-tab writes are not transactional.** Script locks serialize this Apps Script project's calls, but failure injection and recovery still require real TEST validation.
-6. **No automated Apps Script service emulator or CI test workflow exists in the repository.** Static syntax parsing and in-memory mocks cannot prove actual permissions, service quotas, browser deployment behavior or data integrity.
+6. **No automated Apps Script service emulator exists.** A GitHub Actions workflow now checks source/bundle synchronization, key release guards and JavaScript syntax, but it still cannot prove actual Apps Script permissions, service quotas, browser deployment behavior or data integrity.
 7. **A verified backup is not a restore test.** Restore must be rehearsed with a separate TEST copy/project, never by overwriting the active master in place.
 
 ## Phase 0/1/2 live TEST notes
