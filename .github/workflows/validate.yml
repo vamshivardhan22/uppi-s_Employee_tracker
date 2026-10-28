@@ -55,7 +55,7 @@ jobs:
           from pathlib import Path
 
           html = Path("apps-script/Index.html").read_text(encoding="utf-8")
-          scripts = re.findall(r"<script\\b[^>]*>([\\s\\S]*?)</script\\s*>", html, re.IGNORECASE)
+          scripts = re.findall(r"<script\b[^>]*>([\s\S]*?)</script\s*>", html, re.IGNORECASE)
           if len(scripts) != 1:
               raise SystemExit(f"Expected exactly one inline script, found {len(scripts)}")
           Path("/tmp/labeller-dashboard-client.js").write_text(scripts[0], encoding="utf-8")
