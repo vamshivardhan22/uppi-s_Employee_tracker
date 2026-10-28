@@ -8,7 +8,7 @@ The development branch build/phase-0-1-dashboard contains source for all planned
 
 The source of truth remains the modular files under apps-script/; browser-deploy/Main.gs is the browser-copy bundle and browser-deploy/Index.html is the matching UI. Existing project task spreadsheets stay read-only. App-owned records are written only to the separate private master spreadsheet.
 
-A GitHub Actions validation workflow and in-memory identity-gate regression tests are now in place. Latest checked run #14 on 2026-10-28 passed: 17/17 repository source/release-guard checks, 9/9 fake-Script-Properties identity-gate behavior tests, and Node.js syntax checks for modular Apps Script, the combined bundle and dashboard client JavaScript. This is repository-level regression protection only; it does not test deployed Google Apps Script permissions, live sheet I/O, quotas, concurrency or restore behavior.
+A GitHub Actions validation workflow and in-memory identity-gate regression tests are now in place. Latest checked run #30 on 2026-10-28 passed: 17/17 repository source/release-guard checks, 9/9 fake-Script-Properties identity-gate behavior tests, 10/10 attendance date-key regression tests, and Node.js syntax checks for modular Apps Script, the combined bundle and dashboard client JavaScript. This is repository-level regression protection only; it does not test deployed Google Apps Script permissions, live sheet I/O, quotas, concurrency or restore behavior.
 
 ## Phase-by-phase status
 
