@@ -16,7 +16,7 @@ The development branch contains source implementation for all agreed phase areas
 | 5 — Operational readiness | Health overview, configuration audit, TEST backup creation/verification and release checklist. | Source tooling is present; real quota, failure-recovery, concurrency, backup privacy and restore-drill checks remain. |
 | 6 — Controlled rollout | Environment-to-master binding, production-approval gate, browser-only runbook and staged rollout checklist. | Release controls are present in source; no separate production project or pilot has been approved or deployed. |
 
-Repository CI now runs on GitHub Actions. Its latest run passed 17/17 static source/release-guard checks and parsed the modular Apps Script files, browser deployment bundle, and dashboard JavaScript. These checks catch regressions but do not simulate Apps Script services or replace live TEST verification. Continue with synthetic data only until the live TEST checklists pass. Email reminders, scheduled triggers, production access and merge remain gated.
+Repository CI now runs on GitHub Actions. The latest checked run passed 17/17 static source/release-guard checks and 9/9 in-memory identity-gate behavior tests, and parsed the modular Apps Script files, browser deployment bundle, and dashboard JavaScript. These checks catch regressions but do not simulate Apps Script services or replace live TEST verification. Continue with synthetic data only until the live TEST checklists pass. Email reminders, scheduled triggers, production access and merge remain gated.
 
 See docs/VERIFICATION_LOG.md for the distinction between live TEST observations and in-memory/static checks, and docs/TEST_PLAN.md for Phase 0–6 acceptance gates.
 
