@@ -41,6 +41,9 @@ jobs:
       - name: Exercise identity-gate behavior with fake Script Properties
         run: node scripts/test_release_gate.js
 
+      - name: Exercise attendance date-key regression cases
+        run: node scripts/test_attendance_date_keys.js
+
       - name: Parse modular Apps Script files and browser bundle
         shell: bash
         run: |
