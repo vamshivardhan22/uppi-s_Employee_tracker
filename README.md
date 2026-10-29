@@ -58,6 +58,7 @@ docs/
   TEST_PLAN.md
   VERIFICATION_LOG.md
   BROWSER_ONLY_SETUP.md
+  PHASE_3_TEST_RUNBOOK.md
 ```
 
 ## TEST setup
@@ -121,4 +122,4 @@ The release checklist and configuration audit are evidence-gathering tools, not 
 - Do not add attendance, email reminders, triggers or admin-write actions until their phase is implemented and tested.
 - Before a production pilot, test privacy isolation with at least two separate synthetic users and review current Apps Script quotas and identity behavior.
 
-See [Browser-only setup](docs/BROWSER_ONLY_SETUP.md), [Architecture](docs/ARCHITECTURE.md), [Build status](docs/BUILD_STATUS.md), [Test plan](docs/TEST_PLAN.md) and [Verification log](docs/VERIFICATION_LOG.md).
+See [Browser-only setup](docs/BROWSER_ONLY_SETUP.md), [Phase 3 live TEST runbook](docs/PHASE_3_TEST_RUNBOOK.md), [Architecture](docs/ARCHITECTURE.md), [Build status](docs/BUILD_STATUS.md), [Test plan](docs/TEST_PLAN.md) and [Verification log](docs/VERIFICATION_LOG.md).
