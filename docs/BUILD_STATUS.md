@@ -1,6 +1,6 @@
 # Build Status
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Current repository state
 
@@ -39,7 +39,7 @@ A GitHub Actions validation workflow and in-memory identity-gate regression test
 
 - Copy the current browser bundle into the existing TEST Apps Script project and deploy a **new version**, preserving owner execution and signed-in-Google-account access settings.
 - Set and verify APP_ENV_LABEL=TEST, MASTER_SPREADSHEET_ID equal to TEST_MASTER_SPREADSHEET_ID, and IDENTITY_GATE_PASSED=false during auth testing. Enable the TEST data gate only after auth checks pass.
-- Complete the Phase 3 live scan, configured test-only TAT rule, partial-run coverage, digest preview and disabled-trigger checks.
+- Follow [PHASE_3_TEST_RUNBOOK.md](PHASE_3_TEST_RUNBOOK.md) to complete the live baseline scan, stable issue-key repeat, mapped test-only TAT rule, automatic resolution, digest preview and disabled-trigger checks. These require the deployed TEST app and have not been claimed as passed.
 - Complete Phase 4 write-permission tests, project-access revoke tests, date filters, chart cross-checks, report partial-data behavior and snapshot prevention when data is partial.
 - Complete Phase 5 concurrent actions, idempotency/replay, midnight/timezone, quota/load tests, write-failure recovery, private backup verification and a separate TEST restore drill.
 - Confirm completed-status semantics, task/set counting rules, date-field meaning and operational attendance/leave policies with the business owner.
