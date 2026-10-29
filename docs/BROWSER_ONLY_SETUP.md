@@ -82,6 +82,8 @@ Use `docs/TEST_PLAN.md` and `docs/VERIFICATION_LOG.md` as the phase checklist. B
 
 ## 6. Update TEST for Phase 3
 
+Follow the detailed [Phase 3 live TEST runbook](PHASE_3_TEST_RUNBOOK.md) for preflight Script Properties, the current synthetic rows and their expected results, repeated scans, TAT rules, auto-resolution, and digest-preview checks.
+
 Phase 3 is implemented on the development branch, but it is not considered live-tested until copied to Apps Script and deployed as a new version.
 
 1. Open the current development copies: [browser-deploy/Main.gs](https://github.com/vamshivardhan22/uppi-s_Employee_tracker/blob/build/phase-0-1-dashboard/browser-deploy/Main.gs) and [browser-deploy/Index.html](https://github.com/vamshivardhan22/uppi-s_Employee_tracker/blob/build/phase-0-1-dashboard/browser-deploy/Index.html).
