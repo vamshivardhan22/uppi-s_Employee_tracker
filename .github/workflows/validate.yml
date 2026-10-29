@@ -1,0 +1,72 @@
+name: Validate Labeller Dashboard
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - build/phase-0-1-dashboard
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Source sync, release guards, and syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Validate bundled copies and release invariants
+        run: python scripts/validate_repo.py
+
+      - name: Exercise identity-gate behavior with fake Script Properties
+        run: node scripts/test_release_gate.js
+
+      - name: Exercise attendance date-key regression cases
+        run: node scripts/test_attendance_date_keys.js
+
+      - name: Exercise leave-overlap behavior with synthetic rows
+        run: node scripts/test_leave_overlap.js
+
+      - name: Parse modular Apps Script files and browser bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in apps-script/*.gs browser-deploy/Main.gs; do
+            node --check < "$file"
+          done
+
+      - name: Parse dashboard client JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          html = Path("apps-script/Index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script\b[^>]*>([\s\S]*?)</script\s*>", html, re.IGNORECASE)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected exactly one inline script, found {len(scripts)}")
+          Path("/tmp/labeller-dashboard-client.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/labeller-dashboard-client.js

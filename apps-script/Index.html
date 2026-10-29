@@ -1,0 +1,974 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--ink:#182230;--muted:#667085;--line:#e5eaf0;--blue:#2457d6;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+    main{max-width:1180px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:20px}
+    h1{font-size:23px;margin:0}h2{font-size:16px;margin:0 0 12px}.muted,.small{color:var(--muted)}.small{font-size:12px}label{display:block;margin:10px 0 5px;font-weight:600}input,select{max-width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fff;color:var(--ink);font:inherit}input{width:min(100%,420px);display:block;margin-bottom:10px}
+    .panel,.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:17px;margin-bottom:14px}
+    .status{padding:12px;border-radius:10px;background:#eef4ff;color:#1d4ed8;margin:12px 0}.bad{background:#fef3f2;color:#b42318}.good{background:#ecfdf3;color:#067647}.warn{background:#fffaeb;color:#93370d}
+    button{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:10px 13px;font-weight:650;cursor:pointer;margin:4px 5px 4px 0}button:disabled{opacity:.55;cursor:wait}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}.label{font-size:12px;color:var(--muted)}.value{font-size:27px;font-weight:750;margin-top:5px}
+    .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:760px;background:#fff}
+    th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;color:var(--muted);background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}
+    .hidden{display:none!important}.error-list{color:#b42318;padding-left:20px}
+    @media(max-width:700px){main{padding:14px}header{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.value{font-size:24px}}
+    .admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .admin-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin:8px 0;background:#fff;min-width:0}
+    .admin-card h3{margin:0 0 10px;font-size:15px}
+    .admin-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .admin-fields input,.admin-fields select{width:100%;min-width:0}
+    .admin-fields label{font-size:12px}
+    .admin-table{min-width:620px}
+    .bar-row{display:grid;grid-template-columns:minmax(100px,200px) minmax(80px,1fr) 45px;gap:8px;align-items:center;margin:8px 0}
+    .bar-track{height:10px;border-radius:20px;background:#e8edf5;overflow:hidden}
+    .bar-fill{height:100%;border-radius:20px;background:var(--blue)}
+    .admin-report-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .admin-metric{border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
+    .admin-metric .value{font-size:22px}
+    .audit-item{padding:8px;border-bottom:1px solid var(--line)}
+    @media(max-width:700px){.admin-grid{grid-template-columns:1fr}.admin-fields{grid-template-columns:1fr}.admin-report-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.bar-row{grid-template-columns:minmax(90px,120px) minmax(60px,1fr) 38px}}
+  </style>
+</head>
+<body><main>
+  <header><div><h1>Labeller Dashboard</h1><div class="muted">Work overview · Phases 0–6 (TEST-gated)</div></div><div id="phase" class="small">Identity check</div></header>
+  <section id="loginPanel" class="panel">
+    <h2>Employee sign-in</h2>
+    <div class="muted">Use the email on your active Employees record and the unique access code privately issued by the administrator. This code is not your Google password.</div>
+    <label for="loginEmail">Employee email</label>
+    <input id="loginEmail" type="email" autocomplete="username" placeholder="name@gmail.com" required>
+    <label for="loginAccessCode">Employee access code</label>
+    <input id="loginAccessCode" type="password" autocomplete="current-password" placeholder="Paste your private access code" required>
+    <div id="status" class="status">Enter your email and access code to sign in.</div>
+    <div id="details" class="small"></div>
+    <button id="signInButton" onclick="signIn()">Sign in</button>
+    <button id="logoutButton" class="hidden" onclick="signOut()">Sign out</button>
+  </section>
+  <section id="work" class="hidden">
+    <div class="panel"><h2 id="welcome">My Work</h2><div class="muted">Read-only view of your mapped task rows.</div><button id="refreshButton" onclick="loadWork()">Refresh</button><span id="stamp" class="small"></span></div>
+    <div id="partialWarning" class="status warn hidden">Some projects could not be read. The figures below are partial and must not be treated as complete.</div>
+    <div class="cards">
+      <div class="card"><div class="label">Assigned tasks</div><div id="assigned" class="value">—</div></div>
+      <div class="card"><div class="label">Completed tasks</div><div id="completed" class="value">—</div></div>
+      <div class="card"><div class="label">Distinct dataset sets</div><div id="sets" class="value">—</div></div>
+      <div class="card"><div class="label">Assigned projects</div><div id="projects" class="value">—</div></div>
+    </div>
+    <div id="errors" class="panel hidden"></div>
+    <div class="panel"><h2>My task records</h2><div class="tablewrap"><table><thead><tr><th>Project</th><th>Dataset Set ID</th><th>Status</th><th>Assigned date</th><th>Submitted date</th><th>Approved</th><th>Rejected</th><th>Hold note</th></tr></thead><tbody id="rows"><tr><td colspan="8">No data loaded.</td></tr></tbody></table></div></div>
+    <section id="attendancePanel" class="panel">
+      <h2>Attendance & leave</h2>
+      <div class="muted">Actions use server timestamps in Asia/Kolkata. Your attendance records are private to your account; admins can review leave requests.</div>
+      <div id="attendanceStatus" class="status">Attendance status has not loaded.</div>
+      <div id="attendanceControls">
+        <button id="clockInButton" onclick="runAttendanceAction('CLOCK_IN')">Clock in</button>
+        <button id="clockOutButton" onclick="runAttendanceAction('CLOCK_OUT')">Clock out</button>
+        <label class="small" for="breakType">Break type</label>
+        <select id="breakType"><option value="tea">Tea</option><option value="lunch">Lunch</option><option value="personal">Personal</option><option value="other">Other</option></select>
+        <button id="breakStartButton" onclick="runAttendanceAction('BREAK_START')">Start break</button>
+        <button id="breakEndButton" onclick="runAttendanceAction('BREAK_END')">End break</button>
+        <button onclick="loadAttendance()">Refresh attendance</button>
+      </div>
+      <div id="attendanceAdminTools" class="hidden">
+        <button onclick="initializeAttendance()">Initialize attendance storage</button>
+        <div class="small">Creates only app-owned attendance tabs in the private master spreadsheet. Existing tabs with mismatched headers are not overwritten.</div>
+      </div>
+      <div class="panel">
+        <h2>Request leave</h2>
+        <div class="cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <label>Leave type<select id="leaveType" onchange="toggleLeaveFields()"><option value="full_day">Full day</option><option value="half_day">Half day</option><option value="short_leave">Short leave</option></select></label>
+          <label>Start date<input id="leaveStartDate" type="date" required></label>
+          <label>End date<input id="leaveEndDate" type="date" required></label>
+          <label id="partialPeriodWrap" class="hidden">Half-day period<select id="partialPeriod"><option value="AM">AM</option><option value="PM">PM</option></select></label>
+          <label id="shortStartWrap" class="hidden">Short-leave start time<input id="shortStartTime" type="time"></label>
+          <label id="shortEndWrap" class="hidden">Short-leave end time<input id="shortEndTime" type="time"></label>
+          <label style="grid-column:1/-1">Reason (optional)<input id="leaveReason" type="text" maxlength="500" placeholder="Add a short reason"></label>
+        </div>
+        <button onclick="submitLeave()">Submit leave request</button>
+      </div>
+      <div class="panel">
+        <h2>Leave requests</h2>
+        <button onclick="loadLeaveRequests()">Refresh requests</button>
+        <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>Date</th><th>Type</th><th>Status</th><th>Details</th><th id="leaveActionsHeader">Action</th></tr></thead><tbody id="leaveRows"><tr><td colspan="5">No requests loaded.</td></tr></tbody></table></div>
+      </div>
+    </section>
+    <section id="adminPanel" class="panel hidden">
+      <h2>Admin console · People, Projects & Reports</h2>
+      <div class="muted">Admin-only configuration and team-level views. Changes affect the private master configuration, not task-source sheets. New employees need an access code issued privately from the Apps Script editor.</div>
+      <div id="adminStatus" class="status warn">Initialize admin storage before making configuration changes.</div>
+      <button onclick="initializeAdminConsoleStorage()">Initialize admin storage</button>
+      <button onclick="loadAdminConsole()">Refresh people/projects</button>
+
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h3>Employee record</h3>
+          <div class="admin-fields">
+            <label>Email<input id="adminEmployeeEmail" type="email" placeholder="employee@example.com"></label>
+            <label>Display name<input id="adminEmployeeName" type="text" maxlength="100" placeholder="Employee name"></label>
+            <label>Role<select id="adminEmployeeRole"><option value="labeller">Labeller</option><option value="admin">Admin</option></select></label>
+            <label><input id="adminEmployeeActive" type="checkbox" checked style="display:inline;width:auto"> Active employee</label>
+          </div>
+          <button onclick="saveAdminEmployee()">Save employee</button>
+          <button onclick="resetAdminEmployeeForm()">Clear form</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Active</th><th>Action</th></tr></thead><tbody id="adminEmployeeRows"><tr><td colspan="5">Load admin data.</td></tr></tbody></table></div>
+        </div>
+
+        <div class="admin-card">
+          <h3>Project configuration</h3>
+          <div class="admin-fields">
+            <label>Project ID<input id="adminProjectId" type="text" maxlength="64" placeholder="PROJECT-01"></label>
+            <label>Project name<input id="adminProjectName" type="text" maxlength="120" placeholder="Project name"></label>
+            <label>Source Spreadsheet ID<input id="adminProjectSpreadsheetId" type="text" placeholder="ID only, not full URL"></label>
+            <label>Source tab name<input id="adminProjectTab" type="text" maxlength="150" value="Tasks"></label>
+            <label>Timezone<input id="adminProjectTimezone" type="text" value="Asia/Kolkata"></label>
+            <label><input id="adminProjectActive" type="checkbox" checked style="display:inline;width:auto"> Active project</label>
+          </div>
+          <button onclick="saveAdminProject()">Save project</button>
+          <button onclick="resetAdminProjectForm()">Clear form</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>ID</th><th>Project</th><th>Source tab</th><th>Active</th><th>Action</th></tr></thead><tbody id="adminProjectRows"><tr><td colspan="5">Load admin data.</td></tr></tbody></table></div>
+        </div>
+
+        <div class="admin-card">
+          <h3>Project access</h3>
+          <div class="admin-fields">
+            <label>Employee<select id="adminAccessEmployee"></select></label>
+            <label>Project<select id="adminAccessProject"></select></label>
+          </div>
+          <button onclick="changeAdminProjectAccess(true)">Grant access</button>
+          <button onclick="changeAdminProjectAccess(false)">Revoke access</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Email</th><th>Project</th><th>Active</th><th>Action</th></tr></thead><tbody id="adminAccessRows"><tr><td colspan="4">Load admin data.</td></tr></tbody></table></div>
+        </div>
+
+        <div class="admin-card">
+          <h3>Source column mapping</h3>
+          <div class="admin-fields">
+            <label>Project<select id="adminMappingProject" onchange="updateAdminMappingRequired()"></select></label>
+            <label>Canonical field<select id="adminMappingCanonical" onchange="updateAdminMappingRequired()">
+              <option>Dataset Set Id</option><option>Annotator Mail</option><option>Status</option>
+              <option>Assigned Date</option><option>Submitted Date</option><option>Approved Objects</option>
+              <option>Rejected Objects</option><option>Reviewer Rejected Count</option><option>Hold Note</option>
+            </select></label>
+            <label>Source sheet header<input id="adminMappingHeader" type="text" maxlength="150" placeholder="Exact column header"></label>
+            <label><input id="adminMappingRequired" type="checkbox" style="display:inline;width:auto"> Required mapping</label>
+          </div>
+          <button onclick="saveAdminMapping()">Save mapping</button>
+          <div class="small">Dataset Set Id, Annotator Mail and Status must remain required. Header names must match the configured source tab.</div>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Project</th><th>Canonical field</th><th>Source header</th><th>Required</th><th>Action</th></tr></thead><tbody id="adminMappingRows"><tr><td colspan="5">Load admin data.</td></tr></tbody></table></div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3>Team report & charts</h3>
+        <div class="admin-fields">
+          <label>Start date<input id="adminReportFrom" type="date"></label>
+          <label>End date<input id="adminReportTo" type="date"></label>
+          <label>Date field<select id="adminReportDateField"><option value="Assigned Date">Assigned date</option><option value="Submitted Date">Submitted date</option></select></label>
+          <label>Report scope<div class="small">Blank dates include all rows. Date filters apply to the selected field.</div></label>
+        </div>
+        <button onclick="loadTeamReport()">Refresh report</button>
+        <button onclick="createAdminSnapshot()">Save snapshot</button>
+        <div id="adminReportStatus" class="status">Run a report to load team metrics.</div>
+        <div id="adminReportSummary" class="admin-report-cards"></div>
+        <div class="admin-grid">
+          <div class="admin-card"><h3>Tasks by employee</h3><div id="adminEmployeeChart"></div></div>
+          <div class="admin-card"><h3>Tasks by status</h3><div id="adminStatusChart"></div></div>
+          <div class="admin-card"><h3>Tasks by project</h3><div id="adminProjectChart"></div></div>
+          <div class="admin-card"><h3>Daily trend</h3><div class="tablewrap"><table class="admin-table"><thead><tr><th>Date</th><th>Tasks</th><th>Completed</th></tr></thead><tbody id="adminTrendRows"><tr><td colspan="3">No report loaded.</td></tr></tbody></table></div></div>
+        </div>
+        <div id="adminReportErrors"></div>
+      </div>
+
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h3>Saved snapshots</h3>
+          <button onclick="loadAdminSnapshots()">Refresh snapshots</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Captured at</th><th>Window</th><th>Date field</th><th>Created by</th></tr></thead><tbody id="adminSnapshotRows"><tr><td colspan="4">No snapshots loaded.</td></tr></tbody></table></div>
+        </div>
+        <div class="admin-card">
+          <h3>Operational health & release checklist</h3>
+          <button onclick="refreshAdminHealth()">Refresh health</button>
+          <button onclick="runAdminConfigAudit()">Run configuration audit</button>
+          <button onclick="loadAdminReleaseChecklist()">Refresh TEST checklist</button>
+          <div id="adminHealthStatus" class="status">Health data has not loaded.</div>
+          <div id="adminHealthRows"></div>
+          <div id="adminAuditRows"></div>
+          <div id="adminReleaseRows"></div>
+        </div>
+        <div class="admin-card">
+          <h3>Private TEST backup & restore drill</h3>
+          <div class="small">Backups include access hashes and private operational records. Creation is blocked unless the project is explicitly labeled TEST and TEST_BACKUP_ENABLED=true. Restore is a separate manual drill; this app never overwrites an active master in place.</div>
+          <button onclick="createAdminPrivateBackup()">Create private TEST backup</button>
+          <div class="admin-fields">
+            <label>Backup spreadsheet ID<input id="adminBackupSpreadsheetId" type="text" placeholder="ID from the backup URL"></label>
+            <label>Verification<div><button onclick="verifyAdminPrivateBackup()">Verify backup privacy and tabs</button></div></label>
+          </div>
+          <div id="adminBackupStatus" class="status">No backup action run.</div>
+          <button onclick="loadAdminBackups()">Refresh backup log</button>
+          <div class="tablewrap"><table class="admin-table"><thead><tr><th>Created at</th><th>Created by</th><th>Backup ID</th><th>Status</th><th>Open</th></tr></thead><tbody id="adminBackupRows"><tr><td colspan="5">No backups loaded.</td></tr></tbody></table></div>
+        </div>
+      </div>
+    </section>
+    <section id="issuePanel" class="panel hidden">
+      <h2>Issue detection & turnaround time · Admin</h2>
+      <div class="muted">Scans configured task sources read-only and stores issue records in the private master. TAT is calculated only for rules configured in the TAT_Rules tab. A manual scan never sends email.</div>
+      <div id="issueStatus" class="status warn">Initialize Issue/TAT storage before the first scan.</div>
+      <div>
+        <button onclick="initializeIssueStorage()">Initialize issue/TAT storage</button>
+        <button onclick="runIssueScan()">Run issue/TAT scan</button>
+        <button onclick="loadIssueDashboard()">Refresh issue list</button>
+        <button onclick="previewIssueDigest()">Preview reminder digest</button>
+        <button onclick="sendIssueDigest()">Send reminder digest</button>
+      </div>
+      <div class="small">Email reminders are disabled unless Script Property ISSUE_EMAILS_ENABLED is exactly true. Scheduled scans are off by default and require a complete manual scan first.</div>
+      <label class="small" for="issueIntervalHours">Scheduled scan interval</label>
+      <select id="issueIntervalHours"><option value="6">Every 6 hours</option><option value="12">Every 12 hours</option></select>
+      <button onclick="enableIssueSchedule()">Enable scheduled scan</button>
+      <button onclick="disableIssueSchedule()">Disable scheduled scan</button>
+      <div id="issueSummary" class="small"></div>
+      <div id="issueDigestPreview" class="small"></div>
+      <div class="tablewrap" style="margin-top:12px"><table style="min-width:900px">
+        <thead><tr><th>Severity</th><th>Project</th><th>Dataset Set / Row</th><th>Issue</th><th>Assigned to</th><th>Details</th><th>Last seen</th><th>Action</th></tr></thead>
+        <tbody id="issueRows"><tr><td colspan="8">No issue scan loaded.</td></tr></tbody>
+      </table></div>
+    </section>
+  </section>
+  <p class="small">TEST build only. Use synthetic data until the acceptance checklist passes. Phases 4–6 include admin people/project management, team reports and snapshots, operational health/audit, private TEST backup tools and gated release checks. These tools do not replace live validation or production approval.</p>
+</main>
+<script>
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+    });
+  }
+  function setStatus(message, kind) {
+    var el=document.getElementById('status');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  var appToken = '';
+  function getToken() {
+    if(appToken) return appToken;
+    try { appToken=sessionStorage.getItem('labellerSessionToken')||''; } catch(error) {}
+    return appToken;
+  }
+  function setToken(token) {
+    appToken=String(token||'');
+    try {
+      if(appToken) sessionStorage.setItem('labellerSessionToken',appToken);
+      else sessionStorage.removeItem('labellerSessionToken');
+    } catch(error) {}
+  }
+  function signIn() {
+    var email=document.getElementById('loginEmail').value.trim();
+    var code=document.getElementById('loginAccessCode').value.trim();
+    var button=document.getElementById('signInButton');
+    if(!email||!code) { setStatus('Enter your employee email and access code.','bad'); return; }
+    button.disabled=true;
+    google.script.run.withSuccessHandler(function(result) {
+      button.disabled=false;
+      if(!result||!result.ok) {
+        setStatus(result&&result.message?result.message:'Sign-in failed.','bad');
+        return;
+      }
+      setToken(result.token);
+      document.getElementById('loginAccessCode').value='';
+      document.getElementById('logoutButton').classList.remove('hidden');
+      document.getElementById('details').textContent='Signed in as '+result.user.email+' · session expires after 4 hours or earlier if the server cache is cleared.';
+      document.getElementById('phase').textContent=result.dataGatePassed?'Phase 1 enabled':'Phase 0 · data locked';
+      setStatus(result.message,result.dataGatePassed?'good':'warn');
+      if(result.dataGatePassed) loadWork();
+    }).withFailureHandler(function(error) {
+      button.disabled=false;
+      setStatus(error.message||String(error),'bad');
+    }).login(email,code);
+  }
+  function signOut() {
+    var token=getToken();
+    google.script.run.withSuccessHandler(function() {
+      setToken('');
+      document.getElementById('work').classList.add('hidden');
+      document.getElementById('logoutButton').classList.add('hidden');
+      document.getElementById('phase').textContent='Sign in required';
+      document.getElementById('details').textContent='';
+      setStatus('You have signed out.','');
+    }).withFailureHandler(function() {
+      setToken('');
+      document.getElementById('work').classList.add('hidden');
+      document.getElementById('logoutButton').classList.add('hidden');
+      setStatus('Signed out in this browser tab.','');
+    }).logout(token);
+  }
+  function displayDate(value) {
+    if(!value) return '—';
+    var text=String(value);
+    // Date-only values are intentionally kept as date-only to avoid timezone shifts.
+    if(/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    // Do not parse ambiguous locale-formatted strings; preserve source text.
+    return escapeHtml(text);
+  }
+  function loadWork() {
+    var token=getToken();
+    var refresh=document.getElementById('refreshButton');
+    if(!token) { setStatus('Sign in with your employee email and access code.','warn'); return; }
+    if(refresh) refresh.disabled=true;
+    google.script.run.withSuccessHandler(function(bootstrap) {
+      if(!bootstrap||!bootstrap.ok) {
+        setToken('');
+        document.getElementById('work').classList.add('hidden');
+        document.getElementById('logoutButton').classList.add('hidden');
+        document.getElementById('phase').textContent='Sign in required';
+        document.getElementById('details').textContent=bootstrap&&bootstrap.message?bootstrap.message:'Your session expired. Sign in again.';
+        setStatus('Your session is no longer valid. Sign in again.','bad');
+        if(refresh) refresh.disabled=false;
+        return;
+      }
+      document.getElementById('phase').textContent=bootstrap.dataGatePassed?'Phase 1 enabled':'Phase 0 · data locked';
+      document.getElementById('details').textContent='Signed in as '+bootstrap.user.email+' · '+bootstrap.timeZone;
+      if(!bootstrap.dataGatePassed) {
+        document.getElementById('work').classList.add('hidden');
+        setStatus(bootstrap.message,'warn');
+        if(refresh) refresh.disabled=false;
+        return;
+      }
+      google.script.run.withSuccessHandler(function(data) {
+        if(refresh) refresh.disabled=false;
+        document.getElementById('work').classList.remove('hidden');
+        document.getElementById('welcome').textContent='My Work · '+(data.user.displayName||data.user.email);
+        document.getElementById('assigned').textContent=data.cards.assignedTasks;
+        document.getElementById('completed').textContent=data.cards.completedTasks;
+        document.getElementById('sets').textContent=data.cards.distinctSets;
+        document.getElementById('projects').textContent=data.cards.assignedProjects;
+        document.getElementById('stamp').textContent=' Last refreshed: '+data.refreshedAt;
+        document.getElementById('partialWarning').classList.toggle('hidden',!data.hasPartialData);
+        document.getElementById('rows').innerHTML=data.rows.length?data.rows.map(function(row) {
+          return '<tr><td>'+escapeHtml(row.projectName)+'</td><td>'+escapeHtml(row.datasetSetId)+'</td><td>'+
+            escapeHtml(row.status)+'</td><td>'+displayDate(row.assignedDate)+'</td><td>'+displayDate(row.submittedDate)+
+            '</td><td>'+escapeHtml(row.approvedObjects||'—')+'</td><td>'+escapeHtml(row.rejectedObjects||'—')+
+            '</td><td>'+escapeHtml(row.holdNote||'—')+'</td></tr>';
+        }).join(''):'<tr><td colspan="8">No task rows found for your account.</td></tr>';
+        var errors=document.getElementById('errors');
+        errors.classList.toggle('hidden',!data.projectErrors.length);
+        errors.innerHTML=data.projectErrors.length?'<h2>Project connection issues</h2><ul class="error-list">'+
+          data.projectErrors.map(function(item){return '<li><strong>'+escapeHtml(item.projectName||item.projectId)+
+          ':</strong> '+escapeHtml(item.message)+'</li>';}).join('')+'</ul>':'';
+        setStatus('Signed in as '+data.user.email+'. Only your authorized project rows are returned.',data.hasPartialData?'warn':'good');
+        document.getElementById('logoutButton').classList.remove('hidden');
+        if(data.user.role==='admin') {
+          document.getElementById('attendanceAdminTools').classList.remove('hidden');
+          document.getElementById('issuePanel').classList.remove('hidden');
+          document.getElementById('adminPanel').classList.remove('hidden');
+          loadIssueDashboard();
+          loadAdminConsole();
+        } else {
+          document.getElementById('attendanceAdminTools').classList.add('hidden');
+          document.getElementById('issuePanel').classList.add('hidden');
+          document.getElementById('adminPanel').classList.add('hidden');
+        }
+        loadAttendance();
+      }).withFailureHandler(function(error) {
+        if(refresh) refresh.disabled=false;
+        setStatus(error.message||String(error),'bad');
+      }).getMyWork(token);
+    }).withFailureHandler(function(error) {
+      if(refresh) refresh.disabled=false;
+      setStatus(error.message||String(error),'bad');
+    }).getBootstrap(token);
+  }
+  function issueMessage(message, kind) {
+    var el=document.getElementById('issueStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function initializeIssueStorage() {
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).initializeIssueStorage(getToken());
+  }
+  function loadIssueDashboard() {
+    if(!getToken()) return;
+    google.script.run.withSuccessHandler(function(result) {
+      if(!result||!result.ok) {
+        issueMessage(result&&result.message?result.message:'Unable to load issue dashboard.','bad');
+        return;
+      }
+      if(!result.storageReady) {
+        issueMessage(result.message,'warn');
+        document.getElementById('issueRows').innerHTML='<tr><td colspan="8">Initialize issue/TAT storage to begin.</td></tr>';
+        document.getElementById('issueSummary').textContent='';
+        return;
+      }
+      var last=result.lastScan
+        ? ' · Last scan: '+result.lastScan.outcome+' at '+result.lastScan.finishedAt+' ('+result.lastScan.durationMs+' ms; '+result.lastScan.rowsScanned+' rows)'
+        : ' · No scan run yet';
+      document.getElementById('issueSummary').textContent=
+        'Open: '+result.summary.open+' · Critical: '+result.summary.critical+
+        ' · High: '+result.summary.high+' · Medium: '+result.summary.medium+
+        ' · Resolved: '+result.summary.resolved+last;
+      document.getElementById('issueSummary').textContent+=' · Email reminders: '+(result.emailEnabled?'ENABLED':'disabled')+
+        ' · Scheduled scan: '+(result.scheduleEnabled?'enabled':'disabled');
+      if(document.getElementById('issueStatus').textContent.indexOf('Initialize Issue/TAT storage')===0) {
+        issueMessage('Issue/TAT storage is ready. Run a manual scan to start.','good');
+      }
+      document.getElementById('issueRows').innerHTML=result.issues.length?result.issues.map(function(item) {
+        var label=item.datasetSetId?item.datasetSetId:('Row '+item.sourceRow);
+        return '<tr><td>'+escapeHtml(item.severity)+'</td><td>'+escapeHtml(item.projectName)+'</td><td>'+
+          escapeHtml(label)+'</td><td>'+escapeHtml(item.issueType)+'</td><td>'+escapeHtml(item.assignedTo)+'</td><td>'+
+          escapeHtml(item.details)+'</td><td>'+escapeHtml(item.lastSeenAt)+'</td><td><button onclick="resolveIssuePrompt(&#39;'+
+          escapeHtml(item.issueKey)+'&#39;)">Resolve</button></td></tr>';
+      }).join(''):'<tr><td colspan="8">'+(result.lastScan?'No open issues found in the latest recorded scan.':'No scan run yet.')+'</td></tr>';
+      if(!result.scheduleEnabled) document.getElementById('issueIntervalHours').disabled=false;
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).getIssueDashboard(getToken());
+  }
+  function runIssueScan() {
+    issueMessage('Scanning configured project sources…','warn');
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message+' Issues found: '+result.issuesFound+
+        '; opened: '+result.issuesOpened+'; updated: '+result.issuesUpdated+
+        '; resolved: '+result.issuesResolved+'. Duration: '+result.durationMs+' ms.',
+        result.outcome==='COMPLETE'?'good':'warn');
+      if(result.projectErrors&&result.projectErrors.length) {
+        document.getElementById('issueDigestPreview').textContent='Scan notes: '+result.projectErrors.map(function(e) {
+          return e.projectId+': '+e.message;
+        }).join(' | ');
+      }
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).runIssueScan(getToken());
+  }
+  function previewIssueDigest() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('issueDigestPreview').textContent=
+        result.message+' Open issue entries: '+result.openIssues+'. Recipients: '+
+        (result.recipients.length?result.recipients.map(function(r){return r.email+' ('+r.issueCount+')';}).join(', '):'none');
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).previewIssueDigest(getToken());
+  }
+  function sendIssueDigest() {
+    if(!window.confirm('Send an issue digest email to active employees with open issues? A recipient is limited to one digest per day.')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,result.ok?'good':'warn');
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).sendIssueDigest(getToken());
+  }
+  function enableIssueSchedule() {
+    var hours=Number(document.getElementById('issueIntervalHours').value);
+    if(!window.confirm('Enable automatic issue/TAT scans every '+hours+' hours? Emails remain disabled unless ISSUE_EMAILS_ENABLED is explicitly true.')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).installIssueScanTrigger(getToken(),hours);
+  }
+  function disableIssueSchedule() {
+    if(!window.confirm('Disable scheduled issue/TAT scanning?')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).disableIssueScanTrigger(getToken());
+  }
+  function resolveIssuePrompt(issueKey) {
+    var note=window.prompt('Optional resolution note:');
+    if(note===null) return;
+    google.script.run.withSuccessHandler(function(result) {
+      issueMessage(result.message,'good');
+      loadIssueDashboard();
+    }).withFailureHandler(function(error) {
+      issueMessage(error.message||String(error),'bad');
+    }).resolveIssue(getToken(),issueKey,note);
+  }
+  var adminEmployeeData=[];
+  var adminProjectData=[];
+  var adminAccessData=[];
+  var adminMappingData=[];
+  var adminReportData=null;
+  var adminStorageReady=false;
+
+  function adminMessage(message, kind) {
+    var el=document.getElementById('adminStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function adminReportMessage(message, kind) {
+    var el=document.getElementById('adminReportStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function initializeAdminConsoleStorage() {
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good');
+      loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).initializeAdminStorage(getToken());
+  }
+  function adminOptions(items, valueKey, labelFunction) {
+    return items.map(function(item) {
+      return '<option value="'+escapeHtml(item[valueKey])+'">'+escapeHtml(labelFunction(item))+'</option>';
+    }).join('');
+  }
+  function renderAdminEmployees() {
+    document.getElementById('adminEmployeeRows').innerHTML=adminEmployeeData.length
+      ? adminEmployeeData.map(function(item,index) {
+        return '<tr><td>'+escapeHtml(item.email)+'</td><td>'+escapeHtml(item.displayName)+'</td><td>'+
+          escapeHtml(item.role)+'</td><td>'+ (item.active?'Yes':'No')+'</td><td><button onclick="editAdminEmployee('+index+')">Edit</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="5">No employee rows.</td></tr>';
+  }
+  function renderAdminProjects() {
+    document.getElementById('adminProjectRows').innerHTML=adminProjectData.length
+      ? adminProjectData.map(function(item,index) {
+        return '<tr><td>'+escapeHtml(item.projectId)+'</td><td>'+escapeHtml(item.projectName)+'</td><td>'+
+          escapeHtml(item.tabName)+'</td><td>'+ (item.active?'Yes':'No')+'</td><td><button onclick="editAdminProject('+index+')">Edit</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="5">No projects configured.</td></tr>';
+  }
+  function renderAdminAccess() {
+    var projectName={};
+    adminProjectData.forEach(function(project){projectName[project.projectId]=project.projectName;});
+    document.getElementById('adminAccessRows').innerHTML=adminAccessData.length
+      ? adminAccessData.map(function(item,index) {
+        return '<tr><td>'+escapeHtml(item.email)+'</td><td>'+escapeHtml(projectName[item.projectId]||item.projectId)+'</td><td>'+
+          (item.active?'Yes':'No')+'</td><td><button onclick="toggleAdminAccess('+index+')">'+
+          (item.active?'Revoke':'Grant')+'</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="4">No access rows configured.</td></tr>';
+  }
+  function renderAdminMappings() {
+    var projectName={};
+    adminProjectData.forEach(function(project){projectName[project.projectId]=project.projectName;});
+    document.getElementById('adminMappingRows').innerHTML=adminMappingData.length
+      ? adminMappingData.map(function(item,index) {
+        return '<tr><td>'+escapeHtml(projectName[item.projectId]||item.projectId)+'</td><td>'+
+          escapeHtml(item.canonicalField)+'</td><td>'+escapeHtml(item.sheetHeader)+'</td><td>'+
+          (item.required?'Yes':'No')+'</td><td><button onclick="editAdminMapping('+index+')">Edit</button></td></tr>';
+      }).join('')
+      : '<tr><td colspan="5">No mappings configured.</td></tr>';
+  }
+  function populateAdminSelectors() {
+    var activeEmployees=adminEmployeeData.filter(function(item){return item.active;});
+    var activeProjects=adminProjectData.filter(function(item){return item.active;});
+    document.getElementById('adminAccessEmployee').innerHTML=adminOptions(activeEmployees,'email',function(item){
+      return item.displayName+' ('+item.email+')';
+    });
+    document.getElementById('adminAccessProject').innerHTML=adminOptions(activeProjects,'projectId',function(item){
+      return item.projectName+' ('+item.projectId+')';
+    });
+    document.getElementById('adminMappingProject').innerHTML=adminOptions(adminProjectData,'projectId',function(item){
+      return item.projectName+' ('+item.projectId+')';
+    });
+  }
+  function loadAdminConsole() {
+    google.script.run.withSuccessHandler(function(result) {
+      if(!result||!result.ok) { adminMessage('Unable to load admin console.','bad'); return; }
+      adminEmployeeData=result.employees||[];
+      adminProjectData=result.projects||[];
+      adminAccessData=result.access||[];
+      adminMappingData=result.mappings||[];
+      adminStorageReady=Boolean(result.storageReady);
+      populateAdminSelectors();
+      renderAdminEmployees(); renderAdminProjects(); renderAdminAccess(); renderAdminMappings();
+      if(adminStorageReady) {
+        adminMessage('Admin storage ready. Employee/project changes are audit logged. New employees still need access-code provisioning.','good');
+        loadAdminSnapshots();
+        loadAdminBackups();
+        loadAdminReleaseChecklist();
+      } else {
+        adminMessage('Initialize admin storage before saving changes. Missing tabs: '+(result.missingStorage||[]).join(', '),'warn');
+      }
+      loadTeamReport();
+      refreshAdminHealth();
+      updateAdminMappingRequired();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).getAdminConsoleData(getToken());
+  }
+  function resetAdminEmployeeForm() {
+    ['adminEmployeeEmail','adminEmployeeName'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('adminEmployeeRole').value='labeller';
+    document.getElementById('adminEmployeeActive').checked=true;
+  }
+  function editAdminEmployee(index) {
+    var item=adminEmployeeData[index]; if(!item)return;
+    document.getElementById('adminEmployeeEmail').value=item.email;
+    document.getElementById('adminEmployeeName').value=item.displayName;
+    document.getElementById('adminEmployeeRole').value=item.role;
+    document.getElementById('adminEmployeeActive').checked=item.active;
+  }
+  function saveAdminEmployee() {
+    var payload={
+      email:document.getElementById('adminEmployeeEmail').value,
+      displayName:document.getElementById('adminEmployeeName').value,
+      role:document.getElementById('adminEmployeeRole').value,
+      active:document.getElementById('adminEmployeeActive').checked
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good'); loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).saveEmployeeAdmin(getToken(),payload);
+  }
+  function resetAdminProjectForm() {
+    ['adminProjectId','adminProjectName','adminProjectSpreadsheetId'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('adminProjectTab').value='Tasks';
+    document.getElementById('adminProjectTimezone').value='Asia/Kolkata';
+    document.getElementById('adminProjectActive').checked=true;
+  }
+  function editAdminProject(index) {
+    var item=adminProjectData[index]; if(!item)return;
+    document.getElementById('adminProjectId').value=item.projectId;
+    document.getElementById('adminProjectName').value=item.projectName;
+    document.getElementById('adminProjectSpreadsheetId').value=item.spreadsheetId;
+    document.getElementById('adminProjectTab').value=item.tabName;
+    document.getElementById('adminProjectTimezone').value=item.timeZone;
+    document.getElementById('adminProjectActive').checked=item.active;
+  }
+  function saveAdminProject() {
+    var payload={
+      projectId:document.getElementById('adminProjectId').value,
+      projectName:document.getElementById('adminProjectName').value,
+      spreadsheetId:document.getElementById('adminProjectSpreadsheetId').value,
+      tabName:document.getElementById('adminProjectTab').value,
+      timeZone:document.getElementById('adminProjectTimezone').value,
+      active:document.getElementById('adminProjectActive').checked
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good'); loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).saveProjectAdmin(getToken(),payload);
+  }
+  function changeAdminProjectAccess(active) {
+    var email=document.getElementById('adminAccessEmployee').value;
+    var projectId=document.getElementById('adminAccessProject').value;
+    if(!email||!projectId){adminMessage('Choose an active employee and project.','bad');return;}
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good'); loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).setProjectAccessAdmin(getToken(),email,projectId,active);
+  }
+  function toggleAdminAccess(index) {
+    var item=adminAccessData[index]; if(!item)return;
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good'); loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).setProjectAccessAdmin(getToken(),item.email,item.projectId,!item.active);
+  }
+  function updateAdminMappingRequired() {
+    var field=document.getElementById('adminMappingCanonical').value;
+    var required=['Dataset Set Id','Annotator Mail','Status'].indexOf(field)>=0;
+    var box=document.getElementById('adminMappingRequired');
+    if(required) box.checked=true;
+    box.disabled=required;
+  }
+  function editAdminMapping(index) {
+    var item=adminMappingData[index]; if(!item)return;
+    document.getElementById('adminMappingProject').value=item.projectId;
+    document.getElementById('adminMappingCanonical').value=item.canonicalField;
+    document.getElementById('adminMappingHeader').value=item.sheetHeader;
+    document.getElementById('adminMappingRequired').checked=item.required;
+    updateAdminMappingRequired();
+  }
+  function saveAdminMapping() {
+    var payload={
+      projectId:document.getElementById('adminMappingProject').value,
+      canonicalField:document.getElementById('adminMappingCanonical').value,
+      sheetHeader:document.getElementById('adminMappingHeader').value,
+      required:document.getElementById('adminMappingRequired').checked
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      adminMessage(result.message,'good'); loadAdminConsole();
+    }).withFailureHandler(function(error) {
+      adminMessage(error.message||String(error),'bad');
+    }).saveProjectMappingAdmin(getToken(),payload);
+  }
+  function renderAdminBars(targetId, rows, labelKey, valueKey) {
+    var node=document.getElementById(targetId);
+    if(!rows||!rows.length){node.textContent='No data for the current filter.';return;}
+    var max=Math.max.apply(null,rows.map(function(item){return Number(item[valueKey]||0);}).concat([1]));
+    node.innerHTML=rows.slice(0,12).map(function(item) {
+      var value=Number(item[valueKey]||0);
+      var percent=Math.max(0,Math.min(100,value/max*100));
+      return '<div class="bar-row"><div>'+escapeHtml(item[labelKey])+'</div><div class="bar-track"><div class="bar-fill" style="width:'+percent.toFixed(1)+'%"></div></div><div>'+value+'</div></div>';
+    }).join('');
+  }
+  function adminReportFilters() {
+    return {
+      fromDate:document.getElementById('adminReportFrom').value,
+      toDate:document.getElementById('adminReportTo').value,
+      dateField:document.getElementById('adminReportDateField').value
+    };
+  }
+  function loadTeamReport() {
+    google.script.run.withSuccessHandler(function(result) {
+      adminReportData=result;
+      if(result.partialData) {
+        adminReportMessage('Partial report. Do not save a snapshot until all project errors are resolved.','warn');
+      } else {
+        adminReportMessage('Report loaded for '+(result.filters.fromDate||'all dates')+
+          ' through '+(result.filters.toDate||'all dates')+'. Source task sheets were read only.','good');
+      }
+      var cards=[
+        ['Tasks',result.summary.tasks],['Completed',result.summary.completed],
+        ['Open',result.summary.openTasks],['Distinct sets',result.summary.distinctSets],
+        ['Active projects',result.summary.activeProjects],['Active employees',result.summary.activeEmployees],
+        ['Open issues',result.issues.open],['Pending leave',result.leave.pending]
+      ];
+      document.getElementById('adminReportSummary').innerHTML=cards.map(function(card) {
+        return '<div class="admin-metric"><div class="label">'+escapeHtml(card[0])+'</div><div class="value">'+Number(card[1]||0)+'</div></div>';
+      }).join('');
+      renderAdminBars('adminEmployeeChart',result.byEmployee,'displayName','tasks');
+      renderAdminBars('adminStatusChart',result.byStatus,'status','tasks');
+      renderAdminBars('adminProjectChart',result.byProject,'projectName','tasks');
+      document.getElementById('adminTrendRows').innerHTML=result.trend.length
+        ? result.trend.map(function(item){return '<tr><td>'+escapeHtml(item.date)+'</td><td>'+item.tasks+'</td><td>'+item.completed+'</td></tr>';}).join('')
+        : '<tr><td colspan="3">No assigned-date values for this filter.</td></tr>';
+      document.getElementById('adminReportErrors').innerHTML=result.projectErrors&&result.projectErrors.length
+        ? '<div class="status warn">Project errors: <ul>'+result.projectErrors.map(function(item) {
+          return '<li>'+escapeHtml(item.projectName||item.projectId)+': '+escapeHtml(item.message)+'</li>';
+        }).join('')+'</ul></div>' : '';
+    }).withFailureHandler(function(error) {
+      adminReportMessage(error.message||String(error),'bad');
+    }).getTeamReport(getToken(),adminReportFilters());
+  }
+  function createAdminSnapshot() {
+    if(adminReportData&&adminReportData.partialData) {
+      adminReportMessage('Snapshot blocked: resolve project errors first.','bad');return;
+    }
+    if(!window.confirm('Save a private summary snapshot of the current team report?')) return;
+    google.script.run.withSuccessHandler(function(result) {
+      adminReportMessage(result.message,'good'); loadAdminSnapshots();
+    }).withFailureHandler(function(error) {
+      adminReportMessage(error.message||String(error),'bad');
+    }).createTeamSnapshot(getToken(),adminReportFilters());
+  }
+  function loadAdminSnapshots() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminSnapshotRows').innerHTML=result.snapshots&&result.snapshots.length
+        ? result.snapshots.map(function(item) {
+          var windowText=(item.fromDate||'All dates')+' – '+(item.toDate||'All dates');
+          return '<tr><td>'+escapeHtml(item.capturedAt)+'</td><td>'+escapeHtml(windowText)+'</td><td>'+
+            escapeHtml(item.dateField)+'</td><td>'+escapeHtml(item.createdBy)+'</td></tr>';
+        }).join('')
+        : '<tr><td colspan="4">No snapshots saved.</td></tr>';
+    }).withFailureHandler(function(error) {
+      adminReportMessage(error.message||String(error),'bad');
+    }).listTeamSnapshots(getToken());
+  }
+  function refreshAdminHealth() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminHealthStatus').textContent=
+        'Environment: '+result.environment+' · Time zone: '+result.timeZone+
+        ' · Gate: '+(result.dataGatePassed?'enabled':'locked')+
+        ' · Active admins: '+result.activeAdmins+' · Active employees: '+result.activeEmployees+
+        ' · Active projects: '+result.activeProjects+
+        ' · Email: '+(result.issueEmailEnabled?'enabled':'off')+
+        ' · Schedule: '+(result.issueScheduleEnabled?'enabled':'off');
+      document.getElementById('adminHealthRows').innerHTML='<div class="tablewrap"><table class="admin-table"><thead><tr><th>Master tab</th><th>Exists</th><th>Data rows</th><th>Columns</th></tr></thead><tbody>'+
+        result.sheets.map(function(item){return '<tr><td>'+escapeHtml(item.name)+'</td><td>'+(item.exists?'Yes':'No')+'</td><td>'+item.dataRows+'</td><td>'+item.columns+'</td></tr>';}).join('')+
+        '</tbody></table></div>';
+    }).withFailureHandler(function(error) {
+      document.getElementById('adminHealthStatus').textContent=error.message||String(error);
+    }).getOperationalHealth(getToken());
+  }
+  function runAdminConfigAudit() {
+    document.getElementById('adminAuditRows').textContent='Running read-only configuration audit…';
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminAuditRows').innerHTML='<div class="status '+(result.passed?'good':'bad')+'">'+
+        escapeHtml(result.message)+' · Blockers: '+result.summary.blockers+' · Warnings: '+result.summary.warnings+'</div>'+
+        result.checks.map(function(item) {
+          return '<div class="audit-item"><strong>'+(item.passed?'PASS':'FAIL')+' · '+escapeHtml(item.severity)+'</strong> · '+
+            escapeHtml(item.label)+'<div class="small">'+escapeHtml(item.details)+'</div></div>';
+        }).join('');
+    }).withFailureHandler(function(error) {
+      document.getElementById('adminAuditRows').textContent=error.message||String(error);
+    }).runConfigurationAudit(getToken());
+  }
+  function loadAdminReleaseChecklist() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminReleaseRows').innerHTML='<div class="status warn">'+
+        escapeHtml(result.message)+' · '+result.summary.passed+'/'+result.summary.total+' checks passing</div>'+
+        result.steps.map(function(item) {
+          return '<div class="audit-item">'+(item.passed?'PASS':'CHECK')+' · '+escapeHtml(item.label)+'</div>';
+        }).join('');
+    }).withFailureHandler(function(error) {
+      document.getElementById('adminReleaseRows').textContent=error.message||String(error);
+    }).getReleaseChecklist(getToken());
+  }
+  function adminBackupMessage(message,kind) {
+    var el=document.getElementById('adminBackupStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function createAdminPrivateBackup() {
+    if(!window.confirm('Create a private copy of the entire TEST master spreadsheet? This copy includes employee records and access-code hashes.')) return;
+    adminBackupMessage('Creating and verifying private TEST backup…','warn');
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminBackupSpreadsheetId').value=result.spreadsheetId;
+      document.getElementById('adminBackupStatus').innerHTML=escapeHtml(result.message)+
+        ' <a href="'+escapeHtml(result.url)+'" target="_blank" rel="noopener">Open private backup</a>';
+      adminBackupMessage(result.message+' Backup ID: '+result.backupId,'good');
+      document.getElementById('adminBackupStatus').innerHTML=escapeHtml(result.message)+
+        ' <a href="'+escapeHtml(result.url)+'" target="_blank" rel="noopener">Open private backup</a>';
+      loadAdminBackups();refreshAdminHealth();
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).createPrivateTestBackup(getToken());
+  }
+  function verifyAdminPrivateBackup() {
+    var id=document.getElementById('adminBackupSpreadsheetId').value.trim();
+    if(!id){adminBackupMessage('Enter the backup spreadsheet ID first.','bad');return;}
+    google.script.run.withSuccessHandler(function(result) {
+      adminBackupMessage(result.message+' File: '+result.name+' · Tabs: '+result.tabCount,'good');
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).verifyPrivateTestBackup(getToken(),id);
+  }
+  function loadAdminBackups() {
+    google.script.run.withSuccessHandler(function(result) {
+      document.getElementById('adminBackupRows').innerHTML=result.backups&&result.backups.length
+        ? result.backups.map(function(item) {
+          return '<tr><td>'+escapeHtml(item.createdAt)+'</td><td>'+escapeHtml(item.createdBy)+'</td><td>'+
+            escapeHtml(item.backupSpreadsheetId)+'</td><td>'+escapeHtml(item.status)+'</td><td>'+
+            (item.url?'<a href="'+escapeHtml(item.url)+'" target="_blank" rel="noopener">Open</a>':'—')+'</td></tr>';
+        }).join('')
+        : '<tr><td colspan="5">No backups logged.</td></tr>';
+    }).withFailureHandler(function(error) {
+      adminBackupMessage(error.message||String(error),'bad');
+    }).listPrivateTestBackups(getToken());
+  }
+  function newRequestId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID().replace(/-/g,'');
+    return 'req_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14);
+  }
+  function attendanceMessage(message, kind) {
+    var el=document.getElementById('attendanceStatus');
+    el.textContent=message;
+    el.className='status'+(kind?' '+kind:'');
+  }
+  function loadAttendance() {
+    google.script.run.withSuccessHandler(function(data) {
+      var session=data.session;
+      var open=data.hasOpenSession;
+      var lines=['Today: '+data.today+' ('+data.timeZone+')'];
+      if(session) lines.push('Clocked in at '+session.clockInAt);
+      else if(open) lines.push('A previous-day session remains open. Contact an administrator; do not clock in again.');
+      else lines.push('No open attendance session.');
+      if(data.openBreak) lines.push('Active break: '+data.openBreak.type+' since '+data.openBreak.startAt);
+      attendanceMessage(lines.join(' · '),open&&!session?'warn':'good');
+      document.getElementById('clockInButton').disabled=open;
+      document.getElementById('clockOutButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakStartButton').disabled=!open||Boolean(data.openBreak);
+      document.getElementById('breakEndButton').disabled=!Boolean(data.openBreak);
+      if(data.user.role==='admin') document.getElementById('attendanceAdminTools').classList.remove('hidden');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getMyAttendanceStatus(getToken());
+  }
+  function runAttendanceAction(action) {
+    var requestId=newRequestId();
+    var runner=google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message||'Attendance action recorded.','good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    });
+    if(action==='CLOCK_IN') runner.attendanceClockIn(getToken(),requestId);
+    else if(action==='CLOCK_OUT') runner.attendanceClockOut(getToken(),requestId);
+    else if(action==='BREAK_START') runner.attendanceStartBreak(getToken(),requestId,document.getElementById('breakType').value);
+    else if(action==='BREAK_END') runner.attendanceEndBreak(getToken(),requestId);
+  }
+  function initializeAttendance() {
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadAttendance();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).initializeAttendanceStorage(getToken());
+  }
+  function toggleLeaveFields() {
+    var type=document.getElementById('leaveType').value;
+    document.getElementById('partialPeriodWrap').classList.toggle('hidden',type!=='half_day');
+    document.getElementById('shortStartWrap').classList.toggle('hidden',type!=='short_leave');
+    document.getElementById('shortEndWrap').classList.toggle('hidden',type!=='short_leave');
+    if(type==='short_leave') document.getElementById('leaveEndDate').value=document.getElementById('leaveStartDate').value;
+  }
+  function submitLeave() {
+    var type=document.getElementById('leaveType').value;
+    var startDate=document.getElementById('leaveStartDate').value;
+    var payload={
+      startDate:startDate,
+      endDate:type==='short_leave'?startDate:document.getElementById('leaveEndDate').value,
+      leaveType:type,
+      partialPeriod:type==='half_day'?document.getElementById('partialPeriod').value:'',
+      startTime:type==='short_leave'?document.getElementById('shortStartTime').value:'',
+      endTime:type==='short_leave'?document.getElementById('shortEndTime').value:'',
+      reason:document.getElementById('leaveReason').value
+    };
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceSubmitLeaveRequest(getToken(),payload,newRequestId());
+  }
+  function loadLeaveRequests() {
+    google.script.run.withSuccessHandler(function(result) {
+      var isAdmin=result.role==='admin';
+      document.getElementById('leaveActionsHeader').textContent=isAdmin?'Review':'—';
+      var body=document.getElementById('leaveRows');
+      if(!result.rows.length) {
+        body.innerHTML='<tr><td colspan="5">No leave requests found.</td></tr>';
+        return;
+      }
+      body.innerHTML=result.rows.map(function(row) {
+        var date=escapeHtml(row.startDate)+(row.endDate!==row.startDate?' – '+escapeHtml(row.endDate):'');
+        var details=escapeHtml(row.partialPeriod||'')+(row.startTime?' '+escapeHtml(row.startTime)+'–'+escapeHtml(row.endTime):'')+
+          (row.reason?' · '+escapeHtml(row.reason):'')+(isAdmin&&row.email?' · '+escapeHtml(row.email):'');
+        var actions=isAdmin&&row.status==='PENDING'
+          ? '<button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'APPROVED\')">Approve</button><button onclick="reviewLeave(\''+escapeHtml(row.leaveId)+'\',\'REJECTED\')">Reject</button>'
+          : '—';
+        return '<tr><td>'+date+'</td><td>'+escapeHtml(row.leaveType.replace('_',' '))+'</td><td>'+escapeHtml(row.status)+'</td><td>'+details+'</td><td>'+actions+'</td></tr>';
+      }).join('');
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).getAttendanceLeaveRequests(getToken());
+  }
+  function reviewLeave(leaveId,decision) {
+    var note=window.prompt('Optional review note:')||'';
+    google.script.run.withSuccessHandler(function(result) {
+      attendanceMessage(result.message,'good');
+      loadLeaveRequests();
+    }).withFailureHandler(function(error) {
+      attendanceMessage(error.message||String(error),'bad');
+    }).attendanceReviewLeaveRequest(getToken(),leaveId,decision,note,newRequestId());
+  }
+  document.addEventListener('DOMContentLoaded',function() {
+    var today=new Date();
+    var localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    document.getElementById('leaveStartDate').value=localDate;
+    document.getElementById('leaveEndDate').value=localDate;
+    document.getElementById('leaveStartDate').addEventListener('change',function() {
+      if(document.getElementById('leaveType').value==='short_leave') document.getElementById('leaveEndDate').value=this.value;
+    });
+  });
+  document.getElementById('phase').textContent='Sign in required';
+  try { if(sessionStorage.getItem('labellerSessionToken')) loadWork(); else setStatus('Enter your email and access code to sign in.',''); }
+  catch(error) { setStatus('Enter your email and access code to sign in.',''); }
+</script></body></html>
