@@ -106,6 +106,8 @@ Use only synthetic data in a dedicated TEST master spreadsheet and fake source p
 
 ## I. Phase 3 — issue detection, TAT, reminders and scheduling
 
+Use the concrete browser-only [Phase 3 live TEST runbook](PHASE_3_TEST_RUNBOOK.md) for expected baseline results from the existing synthetic project. Mark the checklist below only after testing the deployed TEST web app.
+
 - [ ] Copy the current `browser-deploy/Main.gs` and `browser-deploy/Index.html` into the TEST Apps Script project and deploy a new version. Confirm the existing Google-account audience and owner-execution settings remain unchanged.
 - [ ] Confirm the Phase 3 panel is visible to Admin only; the Labeller must not see scan, resolve, digest, or scheduling actions.
 - [ ] Admin initialization creates `Issue_Registry`, `Issue_Scan_Runs`, `TAT_Rules`, and `Issue_Reminder_Log` with exact headers, and rerunning initialization is idempotent.
