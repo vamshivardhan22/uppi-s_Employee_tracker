@@ -141,8 +141,13 @@ These results verify source consistency and syntax only. They do not prove Googl
 
 ## Automated repository CI — 2026-10-28
 
-- Added `.github/workflows/validate.yml` and `scripts/validate_repo.py` on the development branch.
-- GitHub Actions run #14 (run ID `40639037120`) completed successfully.
+- Added `.github/workflows/validate.yml`, `scripts/validate_repo.py`, `scripts/test_release_gate.js`, `scripts/test_attendance_date_keys.js`, and `scripts/test_leave_overlap.js` on the development branch.
+- GitHub Actions run #48 (run ID `40640474772`) completed successfully after upgrading workflow actions to their Node 24-compatible major versions.
 - The source validator reported **17/17 checks passed**, the identity-gate suite reported **9/9 behavior checks passed**, the attendance date-key suite reported **10/10 regression checks passed**, and the synthetic leave-overlap suite reported **7/7 behavior checks passed**. Coverage includes bundle/module parity, HTML and manifest parity, timezone/runtime settings, fail-closed environment/master binding, opt-in email/scheduling and TEST-only backup guards, admin API guards, snapshot guards, Date/string/invalid-date normalization, overlapping PENDING/APPROVED Date-valued leave, other-user isolation, rejected-history handling, invalid existing dates and successful non-overlapping requests.
 - Node.js syntax checks passed for the modular Apps Script files, combined browser deployment bundle, and dashboard client JavaScript.
 - These are static repository checks. They do not verify deployed Google Apps Script properties, actual service permissions, live sheet operations, quota behavior, race conditions, backup restoration or production readiness.
+
+## Phase 3 live TEST runbook prepared — 2026-10-29
+
+- Added `docs/PHASE_3_TEST_RUNBOOK.md` with the exact TEST-only preflight, browser deployment steps, expected baseline results for synthetic rows `TEST-SET-001` through `TEST-SET-003`, repeat-scan stability check, test-only TAT rule, correction/auto-resolution check, and digest preview requirements.
+- The runbook is a procedure, not evidence that tests have been performed. Phase 3 remains unaccepted until the user runs these steps against the deployed Google Apps Script TEST app. Email, schedules, backups and production deployment remain disabled/not approved.
